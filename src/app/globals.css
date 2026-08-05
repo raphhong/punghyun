@@ -1,26 +1,57 @@
+/* Pretendard (한국어 웹폰트) */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", "Apple SD Gothic Neo",
+    "Noto Sans KR", sans-serif;
+
+  /* 브랜드 컬러 — 신뢰감 있는 딥 네이비 + 그린 포인트 */
+  --color-navy-50: #eef2f7;
+  --color-navy-100: #d6dfea;
+  --color-navy-200: #adbfd5;
+  --color-navy-300: #7f99b8;
+  --color-navy-400: #4f6a93;
+  --color-navy-500: #2f4a72;
+  --color-navy-600: #1d3357;
+  --color-navy-700: #14284a;
+  --color-navy-800: #0e1e3a;
+  --color-navy-900: #0a1830;
+  --color-navy-950: #061020;
+
+  --color-brand-50: #e9fbf3;
+  --color-brand-100: #c8f4e0;
+  --color-brand-200: #93e8c4;
+  --color-brand-300: #57d7a3;
+  --color-brand-400: #24bd84;
+  --color-brand-500: #12a06d;
+  --color-brand-600: #0a8159;
+  --color-brand-700: #0a6849;
+  --color-brand-800: #0b523b;
+  --color-brand-900: #0a4432;
+}
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0a1830;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 히어로 배경 그라디언트 */
+.bg-hero-grid {
+  background-image:
+    radial-gradient(60% 60% at 50% 0%, rgba(18, 160, 109, 0.14) 0%, rgba(10, 24, 48, 0) 70%),
+    linear-gradient(180deg, #0a1830 0%, #0e1e3a 100%);
 }
