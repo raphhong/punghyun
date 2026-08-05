@@ -29,6 +29,7 @@ export const site = {
   },
   nav: [
     { label: "서비스", href: "/service" },
+    { label: "한도 계산기", href: "/calculator" },
     { label: "회사 소개", href: "/about" },
     { label: "상담 신청", href: "/contact" },
   ],

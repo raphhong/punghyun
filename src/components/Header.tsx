@@ -5,6 +5,7 @@ import { useState } from "react";
 import { site } from "@/lib/site";
 import { Container } from "./Container";
 import { ButtonLink } from "./Button";
+import { Logo } from "./Logo";
 import { cn } from "@/lib/cn";
 
 export function Header() {
@@ -13,13 +14,8 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-navy-100 bg-white/90 backdrop-blur-md">
       <Container className="flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2" aria-label="풍현 홈">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-navy-900 text-sm font-bold text-brand-300">
-            豊
-          </span>
-          <span className="text-lg font-bold tracking-tight text-navy-900">
-            풍현
-          </span>
+        <Link href="/" aria-label="풍현 홈">
+          <Logo />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="주요 메뉴">

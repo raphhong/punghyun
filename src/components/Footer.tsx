@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { site } from "@/lib/site";
 import { Container } from "./Container";
+import { LogoMark } from "./Logo";
 
 export function Footer() {
   return (
@@ -8,9 +9,7 @@ export function Footer() {
       <Container className="grid gap-10 py-14 md:grid-cols-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-navy-800 text-sm font-bold text-brand-300">
-              豊
-            </span>
+            <LogoMark size={32} tone="dark" className="h-8 w-8" />
             <span className="text-lg font-bold text-white">주식회사 풍현</span>
           </div>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-navy-300">

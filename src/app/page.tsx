@@ -6,6 +6,7 @@ import { Section, SectionHeader } from "@/components/Section";
 import { ButtonLink } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { JsonLd } from "@/components/JsonLd";
+import { Calculator } from "@/components/Calculator";
 
 const webPageLd = {
   "@context": "https://schema.org",
@@ -110,8 +111,26 @@ export default function Home() {
         </div>
       </Section>
 
+      {/* 예상 한도 계산기 */}
+      <Section className="bg-white" id="calculator">
+        <SectionHeader
+          eyebrow="1분 예상 조회"
+          title="얼마나 받을 수 있을까요?"
+          description="카드매출과 보유 자산만 입력하면 예상 지급 가능 금액을 바로 확인할 수 있습니다."
+        />
+        <div className="mt-12">
+          <Calculator />
+        </div>
+        <div className="mt-8 text-center">
+          <ButtonLink href="/calculator" variant="ghost">
+            계산기 자세히 보기
+            <Icon name="arrow" className="h-4 w-4" />
+          </ButtonLink>
+        </div>
+      </Section>
+
       {/* 강점 */}
-      <Section className="bg-white">
+      <Section className="bg-navy-50">
         <SectionHeader
           eyebrow="왜 풍현인가"
           title="사업자 편에 서는 든든한 파트너"
@@ -121,7 +140,7 @@ export default function Home() {
           {benefits.map((b) => (
             <div
               key={b.title}
-              className="rounded-2xl border border-navy-100 bg-navy-50/50 p-7"
+              className="rounded-2xl border border-navy-100 bg-white p-7"
             >
               <div className="grid h-12 w-12 place-items-center rounded-xl bg-brand-500/10 text-brand-600">
                 <Icon name={b.icon} />
