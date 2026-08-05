@@ -4,6 +4,8 @@ import { Section, SectionHeader } from "@/components/Section";
 import { PageHero } from "@/components/PageHero";
 import { ButtonLink } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "회사 소개",
@@ -34,6 +36,7 @@ const values = [
 export default function AboutPage() {
   return (
     <>
+      <JsonLd data={breadcrumbLd([{ name: "회사 소개", path: "/about" }])} />
       <PageHero
         eyebrow="회사 소개"
         title="사업자의 자금 흐름을 풍요롭게"

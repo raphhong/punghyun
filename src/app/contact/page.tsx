@@ -3,6 +3,8 @@ import { site } from "@/lib/site";
 import { Container } from "@/components/Container";
 import { PageHero } from "@/components/PageHero";
 import { ContactForm } from "@/components/ContactForm";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "상담 신청",
@@ -14,6 +16,7 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   return (
     <>
+      <JsonLd data={breadcrumbLd([{ name: "상담 신청", path: "/contact" }])} />
       <PageHero
         eyebrow="상담 신청"
         title="부담 없이 문의하세요"

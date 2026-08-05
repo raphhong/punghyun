@@ -33,6 +33,13 @@ export const site = {
     { label: "회사 소개", href: "/about" },
     { label: "상담 신청", href: "/contact" },
   ],
+  // 검색엔진 소유 확인 코드 (등록 후 발급받은 값으로 교체하세요)
+  // Google Search Console: search.google.com/search-console
+  // 네이버 서치어드바이저: searchadvisor.naver.com
+  verification: {
+    google: "", // 예: "abcd1234..." (google-site-verification 값)
+    naver: "", // 예: "abcd1234..." (naver-site-verification 값)
+  },
 } as const;
 
 export type Site = typeof site;

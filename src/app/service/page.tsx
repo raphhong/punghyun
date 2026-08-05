@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { site } from "@/lib/site";
-import { steps, processDetail, faqs } from "@/lib/content";
+import { steps, processDetail, faqs, glossary } from "@/lib/content";
 import { Section, SectionHeader } from "@/components/Section";
 import { PageHero } from "@/components/PageHero";
 import { ButtonLink } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { Faq } from "@/components/Faq";
 import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbLd, serviceLd, glossaryLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "서비스 안내 — 세일앤렌탈백(SRB)",
@@ -36,6 +37,9 @@ export default function ServicePage() {
   return (
     <>
       <JsonLd data={faqLd} />
+      <JsonLd data={serviceLd} />
+      <JsonLd data={glossaryLd} />
+      <JsonLd data={breadcrumbLd([{ name: "서비스 안내", path: "/service" }])} />
       <PageHero
         eyebrow="서비스 안내"
         title="세일앤렌탈백 (SRB)"
@@ -143,8 +147,28 @@ export default function ServicePage() {
         </div>
       </Section>
 
-      {/* CTA */}
+      {/* 용어 설명 */}
       <Section className="bg-white">
+        <SectionHeader
+          eyebrow="용어 설명"
+          title="핵심 용어 한눈에"
+          description="세일앤렌탈백을 이해하는 데 필요한 주요 개념을 정리했습니다."
+        />
+        <dl className="mx-auto mt-12 max-w-3xl space-y-4">
+          {glossary.map((g) => (
+            <div
+              key={g.term}
+              className="rounded-2xl border border-navy-100 bg-navy-50/50 p-6"
+            >
+              <dt className="text-lg font-bold text-navy-900">{g.term}</dt>
+              <dd className="mt-2 leading-relaxed text-navy-600">{g.desc}</dd>
+            </div>
+          ))}
+        </dl>
+      </Section>
+
+      {/* CTA */}
+      <Section className="bg-navy-50">
         <div className="rounded-3xl bg-gradient-to-br from-navy-800 to-navy-950 px-8 py-14 text-center sm:py-16">
           <h2 className="text-3xl font-bold text-white sm:text-4xl">
             우리 자산으로 얼마나 가능할까요?

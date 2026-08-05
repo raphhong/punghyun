@@ -5,6 +5,8 @@ import { ButtonLink } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { Calculator } from "@/components/Calculator";
 import { calcConfig } from "@/lib/calculator";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "예상 한도 계산기",
@@ -43,6 +45,9 @@ const factors = [
 export default function CalculatorPage() {
   return (
     <>
+      <JsonLd
+        data={breadcrumbLd([{ name: "예상 한도 계산기", path: "/calculator" }])}
+      />
       <PageHero
         eyebrow="예상 한도 계산기"
         title="얼마나 받을 수 있을까요?"

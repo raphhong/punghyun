@@ -41,6 +41,14 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  verification: {
+    ...(site.verification.google
+      ? { google: site.verification.google }
+      : {}),
+    ...(site.verification.naver
+      ? { other: { "naver-site-verification": site.verification.naver } }
+      : {}),
+  },
 };
 
 const organizationLd = {
