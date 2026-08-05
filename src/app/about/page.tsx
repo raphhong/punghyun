@@ -25,7 +25,7 @@ const values = [
   },
   {
     title: "투명",
-    desc: "숨은 비용 없이 명확한 조건을 안내합니다.",
+    desc: "추가 비용 없이 명확한 조건을 안내합니다.",
   },
   {
     title: "사업자 친화",
@@ -47,11 +47,11 @@ export default function AboutPage() {
       <Section className="bg-white">
         <div className="mx-auto max-w-3xl text-center">
           <SectionHeader eyebrow="우리의 미션" title="든든한 자금 파트너" />
-          <p className="mt-6 text-lg leading-relaxed text-navy-600">
+          <p className="mt-6 text-balance text-lg leading-relaxed text-navy-600">
             매출은 있지만 정산 주기가 길어 자금 공백을 겪는 사업자가 많습니다.
             풍현은 사업자가 보유한 자산을 활용해, 사업을 멈추지 않으면서도 필요한
-            자금을 빠르게 확보할 수 있는 길을 만듭니다. 딱딱한 절차 대신, 사업자
-            편에 서는 든든한 파트너가 되겠습니다.
+            자금을 빠르게 확보할 수 있는 방법을 만듭니다. 복잡한 절차 대신,
+            사업자 편에 서는 든든한 파트너가 되겠습니다.
           </p>
         </div>
       </Section>

@@ -34,10 +34,10 @@ export default function Home() {
               <br />
               <span className="text-brand-300">자금은 지금.</span>
             </h1>
-            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-navy-200">
-              사업의 자산을 활용해 필요한 자금을 빠르게 확보하세요. 사용은
-              계속, 자금은 즉시. 풍현이 사업자의 자금 흐름을 든든하게
-              뒷받침합니다.
+            <p className="mx-auto mt-6 max-w-xl text-balance text-lg leading-relaxed text-navy-200">
+              기존 보유 자산을 활용해 필요한 운영 자금을 확보하세요. 기존 자산
+              사용은 계속, 자금은 즉시 입금. 풍현이 사업자의 자금 흐름을 든든하게
+              뒷받침 하겠습니다.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <ButtonLink href="/contact" size="lg">
@@ -72,10 +72,10 @@ export default function Home() {
             정산은 아직인데,
             <br className="sm:hidden" /> 자금은 지금 필요하신가요?
           </h2>
-          <p className="mt-5 text-lg leading-relaxed text-navy-600">
-            매출은 있지만 정산 주기가 길어 자금 공백이 생기는 사업자님.
-            당장 운영자금이 필요한데 기존 절차는 문턱이 높고 느립니다.
-            풍현은 보유하신 자산을 활용해 더 빠르고 유연한 대안을 제시합니다.
+          <p className="mt-5 text-balance text-lg leading-relaxed text-navy-600">
+            매출은 지속 발생하지만, 당장 필요 운영자금을 확보하기에는 기존 금융
+            프로그램의 절차는 문턱이 높고 복잡합니다. 풍현은 보유하신 자산을
+            활용하여 더 빠르고, 적합한 대안을 제시합니다.
           </p>
         </div>
       </Section>
@@ -83,9 +83,8 @@ export default function Home() {
       {/* 서비스 3단계 프로세스 */}
       <Section className="bg-navy-50">
         <SectionHeader
-          eyebrow="세일앤렌탈백 (SRB)"
           title="3단계로 끝나는 자금 확보"
-          description="매입 → 렌탈 → 선택. 복잡하지 않습니다."
+          description="매입 → 렌탈 → 만기 후 방안 선택"
         />
         <div className="mt-14 grid gap-6 md:grid-cols-3">
           {steps.map((s) => (

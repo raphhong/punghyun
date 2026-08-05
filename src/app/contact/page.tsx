@@ -18,9 +18,9 @@ export default function ContactPage() {
     <>
       <JsonLd data={breadcrumbLd([{ name: "상담 신청", path: "/contact" }])} />
       <PageHero
-        eyebrow="상담 신청"
+        eyebrow="무료 상담 신청"
         title="부담 없이 문의하세요"
-        description="간단한 정보만 남겨주시면 담당자가 연락드려 맞춤 상담을 진행합니다. 상담은 무료입니다."
+        description="간단한 정보만 남겨주시면 담당자가 연락드려 맞춤 상담을 진행합니다."
       />
 
       <Container className="py-16 sm:py-20">

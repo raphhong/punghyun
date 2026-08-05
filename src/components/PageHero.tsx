@@ -16,10 +16,10 @@ export function PageHero({
           <p className="text-sm font-semibold uppercase tracking-wide text-brand-300">
             {eyebrow}
           </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
+          <h1 className="mt-3 text-balance text-4xl font-bold tracking-tight sm:text-5xl">
             {title}
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-navy-200">
+          <p className="mx-auto mt-5 max-w-2xl text-pretty text-lg leading-relaxed text-navy-200">
             {description}
           </p>
         </div>

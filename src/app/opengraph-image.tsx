@@ -38,7 +38,7 @@ export default function OgImage() {
           >
             <svg width="44" height="44" viewBox="0 0 32 32" fill="none">
               <path
-                d="M10 25 C 10.5 19, 12 19, 12 8 H16.5 A4 4 0 0 1 16.5 16 H12"
+                d="M12 24 V8 H16.5 A4.5 4.5 0 0 1 16.5 17 H12"
                 fill="none"
                 stroke="#57d7a3"
                 strokeWidth="3"

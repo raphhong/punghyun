@@ -82,7 +82,7 @@ export default function CalculatorPage() {
           <SectionHeader
             eyebrow="정확한 금액이 궁금하다면"
             title="상담으로 맞춤 한도를 확인하세요"
-            description="계산기 결과는 참고용 예상치입니다. 자산 심사를 거치면 실제 지급 가능 금액과 조건을 정확히 안내해 드립니다."
+            description="계산기 결과는 참고용이며, 자산 심사를 거치면 실제 지급 가능 금액과 조건을 정확히 안내드립니다."
           />
           <div className="mt-8">
             <ButtonLink href="/contact" size="lg">
