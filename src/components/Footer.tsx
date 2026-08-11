@@ -56,6 +56,8 @@ export function Footer() {
               </a>
             </li>
             <li>운영시간 {site.contact.hours}</li>
+            <li>대표자 {site.ceo}</li>
+            <li>{site.contact.address}</li>
           </ul>
         </div>
       </Container>

@@ -24,9 +24,10 @@ export const site = {
     phoneHref: "tel:16000000",
     email: "contact@punghyun.co.kr",
     kakaoUrl: "", // 카카오 채널 URL이 있으면 입력
-    address: "서울특별시",
+    address: "서울특별시 강남구 선릉로 521, 3층 (역삼동, 비꼴리끄)",
     hours: "평일 09:00 – 18:00",
   },
+  ceo: "홍솔",
   nav: [
     { label: "서비스", href: "/service" },
     { label: "한도 계산기", href: "/calculator" },
