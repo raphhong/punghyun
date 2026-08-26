@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import { site } from "@/lib/site";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { JsonLd } from "@/components/JsonLd";
+import { ADMIN_BASE } from "@/lib/admin/config";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -75,9 +77,21 @@ const organizationLd = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const isAdmin = pathname.startsWith(ADMIN_BASE);
+
+  if (isAdmin) {
+    // 어드민: 마케팅 헤더/푸터·구조화데이터 없이 렌더링
+    return (
+      <html lang="ko" className="h-full antialiased">
+        <body className="min-h-full bg-navy-50">{children}</body>
+      </html>
+    );
+  }
+
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="flex min-h-full flex-col bg-white">
