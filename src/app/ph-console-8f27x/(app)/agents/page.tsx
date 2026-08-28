@@ -3,6 +3,9 @@ import type { SalesAgent } from "@/lib/sales/agent";
 import { approveAgent, rejectAgent, resetAgent } from "./actions";
 
 export const metadata = { title: "영업자 관리" };
+// 가입 신청은 /sales 쪽에서 일어나므로 이 페이지 캐시가 자동 갱신되지 않는다.
+// 항상 최신 목록을 보여주기 위해 동적 렌더 강제.
+export const dynamic = "force-dynamic";
 
 type AgentRow = Pick<
   SalesAgent,
