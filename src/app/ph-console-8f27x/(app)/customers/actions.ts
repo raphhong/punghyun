@@ -190,6 +190,49 @@ export async function uploadDocument(formData: FormData) {
   refresh(customer_id);
 }
 
+// ── 서명 업로드 URL 발급 (관리자 브라우저 직접 업로드) ─
+export async function createDocUploadUrl(
+  customer_id: string,
+  doc_key: string,
+  filename: string,
+): Promise<{ path: string; token: string } | { error: string }> {
+  const supabase = await createClient();
+  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
+  const path = `${customer_id}/${doc_key}-${Date.now()}.${ext}`;
+
+  const { data, error } = await supabase.storage
+    .from("customer-docs")
+    .createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "URL 발급 실패" };
+
+  return { path: data.path, token: data.token };
+}
+
+// ── 업로드 완료 후 DB 기록 (관리자) ──────────────
+export async function recordDocUpload(
+  customer_id: string,
+  doc_key: string,
+  category: string,
+  path: string,
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("customer_documents").upsert(
+    {
+      customer_id,
+      doc_key,
+      category,
+      checked: true,
+      file_path: path,
+      uploaded_at: new Date().toISOString(),
+    },
+    { onConflict: "customer_id,doc_key" },
+  );
+  if (error) return { error: error.message };
+
+  refresh(customer_id);
+  return { ok: true };
+}
+
 // ── 고객 삭제 ───────────────────────────────────
 export async function deleteCustomer(formData: FormData) {
   const id = String(formData.get("id"));

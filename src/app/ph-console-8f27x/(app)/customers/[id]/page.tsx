@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { site } from "@/lib/site";
 import { ShareLink } from "@/components/admin/ShareLink";
+import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { adminPath } from "@/lib/admin/config";
 import {
   HOSPITAL_TYPES,
@@ -25,7 +26,6 @@ import {
   toggleDocument,
   updateBasic,
   updatePipeline,
-  uploadDocument,
 } from "../actions";
 
 export const metadata = { title: "고객 상세" };
@@ -394,19 +394,11 @@ function DocList({
               )}
             </span>
 
-            <form action={uploadDocument} className="flex items-center gap-2">
-              <input type="hidden" name="customer_id" value={customerId} />
-              <input type="hidden" name="doc_key" value={doc.key} />
-              <input type="hidden" name="category" value={doc.category} />
-              <input
-                type="file"
-                name="file"
-                className="max-w-[180px] text-xs text-navy-500 file:mr-2 file:rounded-md file:border-0 file:bg-navy-100 file:px-2 file:py-1 file:text-navy-700"
-              />
-              <button className="rounded-md border border-navy-200 px-2.5 py-1 text-xs font-medium text-navy-600 hover:bg-navy-50">
-                업로드
-              </button>
-            </form>
+            <AdminDocUpload
+              customerId={customerId}
+              docKey={doc.key}
+              category={doc.category}
+            />
           </li>
         );
       })}

@@ -9,7 +9,8 @@ import {
   type DocItem,
 } from "@/lib/admin/pipeline";
 import type { CustomerDocument } from "@/lib/admin/types";
-import { savePublicInfo, uploadPublicDoc } from "./actions";
+import { PublicDocUpload } from "@/components/PublicDocUpload";
+import { savePublicInfo } from "./actions";
 
 export const metadata: Metadata = {
   title: "스크리닝 정보 제출",
@@ -58,7 +59,6 @@ export default async function PublicSubmitPage({
   );
 
   const saveInfo = savePublicInfo.bind(null, token);
-  const uploadDoc = uploadPublicDoc.bind(null, token);
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-xl px-4 py-8 sm:py-12">
@@ -130,7 +130,7 @@ export default async function PublicSubmitPage({
             각 항목의 파일을 선택하고 업로드를 눌러 주세요.
           </p>
         </div>
-        <DocUpload docs={SCREENING_2_DOCS} docMap={docMap} action={uploadDoc} />
+        <DocUpload docs={SCREENING_2_DOCS} docMap={docMap} token={token} />
       </section>
 
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
@@ -140,7 +140,7 @@ export default async function PublicSubmitPage({
             기기 사진 및 목록을 업로드해 주세요.
           </p>
         </div>
-        <DocUpload docs={SCREENING_3_DOCS} docMap={docMap} action={uploadDoc} />
+        <DocUpload docs={SCREENING_3_DOCS} docMap={docMap} token={token} />
       </section>
 
       <p className="mt-8 text-center text-xs text-navy-400">
@@ -153,43 +153,25 @@ export default async function PublicSubmitPage({
 function DocUpload({
   docs,
   docMap,
-  action,
+  token,
 }: {
   docs: DocItem[];
   docMap: Map<string, Partial<CustomerDocument>>;
-  action: (formData: FormData) => void;
+  token: string;
 }) {
   return (
     <ul className="space-y-3">
       {docs.map((doc) => {
         const row = docMap.get(doc.key);
-        const done = !!row?.file_path;
         return (
-          <li key={doc.key} className="rounded-xl border border-navy-100 p-3">
-            <div className="mb-2 flex items-center gap-2">
-              <span
-                className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-                  done ? "bg-brand-500 text-white" : "bg-navy-100 text-transparent"
-                }`}
-              >
-                ✓
-              </span>
-              <span className="text-sm font-medium text-navy-800">{doc.label}</span>
-              {done && <span className="text-xs text-brand-600">업로드됨</span>}
-            </div>
-            <form action={action} className="flex flex-wrap items-center gap-2">
-              <input type="hidden" name="doc_key" value={doc.key} />
-              <input type="hidden" name="category" value={doc.category} />
-              <input
-                type="file"
-                name="file"
-                className="min-w-0 flex-1 text-xs text-navy-500 file:mr-2 file:rounded-md file:border-0 file:bg-navy-100 file:px-2 file:py-1.5 file:text-navy-700"
-              />
-              <button className="rounded-md bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-800">
-                업로드
-              </button>
-            </form>
-          </li>
+          <PublicDocUpload
+            key={doc.key}
+            token={token}
+            docKey={doc.key}
+            category={doc.category}
+            label={doc.label}
+            done={!!row?.file_path}
+          />
         );
       })}
     </ul>
