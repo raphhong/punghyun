@@ -22,12 +22,12 @@ export function LogoMark({
       role="img"
       aria-label="풍현 로고"
     >
-      <rect width="32" height="32" rx="8" fill={bg} />
+      <rect width="32" height="32" rx="9" fill={bg} />
       <path
-        d="M12 24 V8 H16.5 A4.5 4.5 0 0 1 16.5 17 H12"
+        d="M11 25 V7 H17 a5.5 5.5 0 0 1 0 11 H11"
         fill="none"
         stroke="#57d7a3"
-        strokeWidth="3"
+        strokeWidth="3.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

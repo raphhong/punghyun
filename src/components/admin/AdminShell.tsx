@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Sidebar } from "./Sidebar";
+import { LogoMark } from "@/components/Logo";
 import { signOut } from "@/app/ph-console-8f27x/login/actions";
 import { cn } from "@/lib/cn";
 
@@ -21,9 +22,7 @@ export function AdminShell({
       {/* 데스크톱 사이드바 */}
       <aside className="hidden bg-navy-900 lg:flex lg:flex-col">
         <div className="flex h-16 items-center gap-2 border-b border-navy-800 px-5">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-navy-800 text-sm font-bold text-brand-300">
-            豊
-          </span>
+          <LogoMark size={32} tone="dark" className="h-8 w-8" />
           <span className="font-bold text-white">풍현 관리자</span>
         </div>
         <div className="flex-1 overflow-y-auto">

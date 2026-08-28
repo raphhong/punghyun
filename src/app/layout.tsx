@@ -77,6 +77,19 @@ const organizationLd = {
   },
 };
 
+// Pretendard 폰트: 초기 HTML에서 즉시 병렬 로드 (CSS @import 대비 렌더 블로킹 제거)
+function FontLinks() {
+  return (
+    <>
+      <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+      <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+      />
+    </>
+  );
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -87,6 +100,9 @@ export default async function RootLayout({
     // 어드민: 마케팅 헤더/푸터·구조화데이터 없이 렌더링
     return (
       <html lang="ko" className="h-full antialiased">
+        <head>
+          <FontLinks />
+        </head>
         <body className="min-h-full bg-navy-50">{children}</body>
       </html>
     );
@@ -94,6 +110,9 @@ export default async function RootLayout({
 
   return (
     <html lang="ko" className="h-full antialiased">
+      <head>
+        <FontLinks />
+      </head>
       <body className="flex min-h-full flex-col bg-white">
         <JsonLd data={organizationLd} />
         <Header />
