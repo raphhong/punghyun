@@ -94,10 +94,11 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const pathname = (await headers()).get("x-pathname") ?? "";
-  const isAdmin = pathname.startsWith(ADMIN_BASE);
+  // 어드민 콘솔, 영업자 제출 링크(/s)는 마케팅 헤더/푸터 없이 렌더링
+  const bare = pathname.startsWith(ADMIN_BASE) || pathname.startsWith("/s/");
 
-  if (isAdmin) {
-    // 어드민: 마케팅 헤더/푸터·구조화데이터 없이 렌더링
+  if (bare) {
+    // 마케팅 헤더/푸터·구조화데이터 없이 렌더링
     return (
       <html lang="ko" className="h-full antialiased">
         <head>

@@ -10,6 +10,7 @@ export type Customer = {
   updated_at: string;
   source: CustomerSource;
   stage: StageKey;
+  share_token: string;
 
   representative: string | null;
   phone: string | null;

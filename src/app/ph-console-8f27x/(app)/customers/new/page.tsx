@@ -34,13 +34,13 @@ export default function NewCustomerPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="hospital_name" className={labelCls}>
-              병원명
+              상호(업체명)
             </label>
             <input
               id="hospital_name"
               name="hospital_name"
               className={inputCls}
-              placeholder="○○의원"
+              placeholder="○○의원 / ○○상사"
             />
           </div>
           <div>
@@ -79,7 +79,7 @@ export default function NewCustomerPage() {
           </div>
           <div>
             <label htmlFor="hospital_type" className={labelCls}>
-              병원 유형
+              고객 유형
             </label>
             <select id="hospital_type" name="hospital_type" className={inputCls}>
               <option value="">선택</option>

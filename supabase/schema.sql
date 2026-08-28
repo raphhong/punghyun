@@ -39,13 +39,14 @@ create table if not exists public.customers (
   updated_at            timestamptz not null default now(),
   source                customer_source not null default 'manual',
   stage                 customer_stage  not null default 'intake',
+  share_token           uuid not null default gen_random_uuid(), -- 영업자 제출 링크 토큰
 
   -- 기본 정보 (인입/1차)
   representative        text,           -- 대표자
   phone                 text,           -- 연락처
   email                 text,           -- 이메일
-  hospital_name         text,           -- 병원명
-  hospital_type         hospital_type,  -- 병원유형(개인/법인)
+  hospital_name         text,           -- 상호(업체명)
+  hospital_type         hospital_type,  -- 고객유형(개인/법인)
   needed_funds          text,           -- 필요자금
 
   -- 일자
@@ -82,6 +83,7 @@ create table if not exists public.customers (
 
 create index if not exists customers_stage_idx on public.customers (stage);
 create index if not exists customers_created_at_idx on public.customers (created_at desc);
+create unique index if not exists customers_share_token_idx on public.customers (share_token);
 
 -- ── customer_documents 테이블 (서류/사진 체크리스트) ──────
 create table if not exists public.customer_documents (

@@ -63,7 +63,7 @@ export default async function CustomersPage({
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="bg-navy-50 text-navy-500">
               <tr>
-                <th className="px-4 py-3 font-medium">병원명</th>
+                <th className="px-4 py-3 font-medium">상호</th>
                 <th className="px-4 py-3 font-medium">대표자</th>
                 <th className="px-4 py-3 font-medium">연락처</th>
                 <th className="px-4 py-3 font-medium">유형</th>

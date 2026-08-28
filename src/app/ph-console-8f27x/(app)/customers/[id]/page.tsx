@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { site } from "@/lib/site";
+import { ShareLink } from "@/components/admin/ShareLink";
 import { adminPath } from "@/lib/admin/config";
 import {
   HOSPITAL_TYPES,
@@ -114,7 +116,7 @@ export default async function CustomerDetailPage({
             ← 목록
           </Link>
           <h1 className="mt-1 text-2xl font-bold text-navy-900">
-            {customer.hospital_name || "(병원명 미입력)"}
+            {customer.hospital_name || "(상호 미입력)"}
           </h1>
           <p className="mt-1 flex items-center gap-2 text-sm text-navy-500">
             <span className="rounded-full bg-navy-100 px-2.5 py-1 text-xs font-medium text-navy-700">
@@ -170,12 +172,20 @@ export default async function CustomerDetailPage({
         </button>
       </form>
 
+      {/* 영업자 제출 링크 */}
+      <Card
+        title="영업자 제출 링크"
+        desc="이 링크를 영업자에게 전달하면, 로그인 없이 기본정보·서류를 올릴 수 있습니다."
+      >
+        <ShareLink url={`${site.url}/s/${customer.share_token}`} />
+      </Card>
+
       {/* 기본 정보 + 단계별 필드 (하나의 폼) */}
       <form action={updateAction} className="space-y-6">
         <Card title="기본 정보" desc="인입 · 스크리닝 1차">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelCls}>병원명</label>
+              <label className={labelCls}>상호(업체명)</label>
               <input name="hospital_name" defaultValue={customer.hospital_name ?? ""} className={inputCls} />
             </div>
             <div>
@@ -191,7 +201,7 @@ export default async function CustomerDetailPage({
               <input name="email" type="email" defaultValue={customer.email ?? ""} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>병원 유형</label>
+              <label className={labelCls}>고객 유형</label>
               <select name="hospital_type" defaultValue={customer.hospital_type ?? ""} className={inputCls}>
                 <option value="">선택</option>
                 {HOSPITAL_TYPES.map((t) => (

@@ -75,7 +75,7 @@ export default async function DashboardPage() {
                 >
                   <div>
                     <p className="font-medium text-navy-900">
-                      {c.hospital_name || "(병원명 미입력)"}
+                      {c.hospital_name || "(상호 미입력)"}
                     </p>
                     <p className="text-sm text-navy-500">
                       {c.representative || "-"} ·{" "}
