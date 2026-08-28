@@ -98,6 +98,20 @@ export default async function CustomerDetailPage({
   const docs = (docRows ?? []) as CustomerDocument[];
   const docMap = new Map(docs.map((d) => [d.doc_key, d]));
 
+  // 업로드된 파일들의 서명 URL 생성 (비공개 버킷 → 1시간 유효 링크)
+  const filePaths = docs
+    .map((d) => d.file_path)
+    .filter((p): p is string => !!p);
+  const signedMap = new Map<string, string>();
+  if (filePaths.length) {
+    const { data: signed } = await supabase.storage
+      .from("customer-docs")
+      .createSignedUrls(filePaths, 3600);
+    for (const s of signed ?? []) {
+      if (s.signedUrl && s.path) signedMap.set(s.path, s.signedUrl);
+    }
+  }
+
   const stage = customer.stage as StageKey;
   const next = nextStage(stage, customer.source);
   const prev = prevStage(stage);
@@ -249,11 +263,11 @@ export default async function CustomerDetailPage({
 
       {/* 서류 체크리스트 (기본정보 다음) */}
       <Card title="2차 서류 (스크리닝 2)" desc="필수 서류 수집">
-        <DocList docs={SCREENING_2_DOCS} customerId={id} docMap={docMap} />
+        <DocList docs={SCREENING_2_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
       </Card>
 
       <Card title="3차 서류 (스크리닝 3)" desc="기기 사진 · 정보 수집">
-        <DocList docs={SCREENING_3_DOCS} customerId={id} docMap={docMap} />
+        <DocList docs={SCREENING_3_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
       </Card>
 
       {/* 진행 단계 */}
@@ -355,10 +369,12 @@ function DocList({
   docs,
   customerId,
   docMap,
+  signedMap,
 }: {
   docs: DocItem[];
   customerId: string;
   docMap: Map<string, CustomerDocument>;
+  signedMap: Map<string, string>;
 }) {
   return (
     <ul className="divide-y divide-navy-100">
@@ -387,8 +403,23 @@ function DocList({
 
             <span className={`flex-1 text-sm ${checked ? "text-navy-800" : "text-navy-500"}`}>
               {doc.label}
-              {row?.file_path && (
-                <span className="ml-2 text-xs text-brand-600">· 파일 업로드됨</span>
+              {row?.file_path && signedMap.get(row.file_path) && (
+                <span className="ml-2 inline-flex gap-2 align-middle">
+                  <a
+                    href={signedMap.get(row.file_path)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-medium text-brand-600 hover:underline"
+                  >
+                    보기
+                  </a>
+                  <a
+                    href={`${signedMap.get(row.file_path)}&download`}
+                    className="text-xs font-medium text-navy-500 hover:underline"
+                  >
+                    다운로드
+                  </a>
+                </span>
               )}
             </span>
 
