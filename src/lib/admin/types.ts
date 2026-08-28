@@ -11,6 +11,7 @@ export type Customer = {
   source: CustomerSource;
   stage: StageKey;
   share_token: string;
+  sales_agent_id: string | null;
 
   representative: string | null;
   phone: string | null;
