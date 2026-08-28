@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { ClickableRow } from "@/components/admin/ClickableRow";
 import { adminPath } from "@/lib/admin/config";
 import {
   STAGE_MAP,
@@ -75,14 +76,14 @@ export default async function CustomersPage({
             </thead>
             <tbody className="divide-y divide-navy-100">
               {customers?.map((c: Partial<Customer>) => (
-                <tr key={c.id} className="hover:bg-navy-50">
+                <ClickableRow
+                  key={c.id}
+                  href={adminPath(`customers/${c.id}`)}
+                >
                   <td className="px-4 py-3">
-                    <Link
-                      href={adminPath(`customers/${c.id}`)}
-                      className="font-medium text-navy-900 hover:text-brand-600"
-                    >
+                    <span className="font-medium text-navy-900">
                       {c.hospital_name || "(미입력)"}
-                    </Link>
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-navy-600">
                     {c.representative || "-"}
@@ -109,7 +110,7 @@ export default async function CustomersPage({
                   <td className="px-4 py-3 text-navy-500">
                     {c.source === "homepage" ? "공홈" : "수동"}
                   </td>
-                </tr>
+                </ClickableRow>
               ))}
             </tbody>
           </table>

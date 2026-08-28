@@ -54,8 +54,8 @@ export async function createCustomer(formData: FormData) {
   redirect(adminPath(`customers/${data.id}`));
 }
 
-// ── 고객 정보 업데이트 (필드 전체) ────────────────
-export async function updateCustomer(id: string, formData: FormData) {
+// ── 기본 정보 업데이트 ───────────────────────────
+export async function updateBasic(id: string, formData: FormData) {
   const supabase = await createClient();
 
   const patch = {
@@ -69,7 +69,18 @@ export async function updateCustomer(id: string, formData: FormData) {
     intake_date: str(formData, "intake_date"),
     contract_date: str(formData, "contract_date"),
     maturity_date: str(formData, "maturity_date"),
+  };
 
+  const { error } = await supabase.from("customers").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+  refresh(id);
+}
+
+// ── 진행 단계 필드 업데이트 (실사·계약·운영·만기·메모) ─
+export async function updatePipeline(id: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const patch = {
     inspection_date: str(formData, "inspection_date"),
     execution_amount: num(formData, "execution_amount"),
     rental_price: num(formData, "rental_price"),

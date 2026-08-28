@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { site } from "@/lib/site";
@@ -22,7 +23,8 @@ import {
   moveStage,
   setStage,
   toggleDocument,
-  updateCustomer,
+  updateBasic,
+  updatePipeline,
   uploadDocument,
 } from "../actions";
 
@@ -102,7 +104,14 @@ export default async function CustomerDetailPage({
   const next = nextStage(stage, customer.source);
   const prev = prevStage(stage);
 
-  const updateAction = updateCustomer.bind(null, id);
+  const updateBasicAction = updateBasic.bind(null, id);
+  const updatePipelineAction = updatePipeline.bind(null, id);
+
+  // 실제 접속 도메인 기준으로 공유 링크 생성 (site.url 미연결 도메인 회피)
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const baseUrl = host ? `${proto}://${host}` : site.url;
 
   return (
     <div className="space-y-6">
@@ -177,11 +186,11 @@ export default async function CustomerDetailPage({
         title="영업자 제출 링크"
         desc="이 링크를 영업자에게 전달하면, 로그인 없이 기본정보·서류를 올릴 수 있습니다."
       >
-        <ShareLink url={`${site.url}/s/${customer.share_token}`} />
+        <ShareLink url={`${baseUrl}/s/${customer.share_token}`} />
       </Card>
 
-      {/* 기본 정보 + 단계별 필드 (하나의 폼) */}
-      <form action={updateAction} className="space-y-6">
+      {/* 기본 정보 */}
+      <form action={updateBasicAction} className="space-y-6">
         <Card title="기본 정보" desc="인입 · 스크리닝 1차">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -230,6 +239,27 @@ export default async function CustomerDetailPage({
           </div>
         </Card>
 
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="rounded-lg bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-brand-600"
+          >
+            기본 정보 저장
+          </button>
+        </div>
+      </form>
+
+      {/* 서류 체크리스트 (기본정보 다음) */}
+      <Card title="2차 서류 (스크리닝 2)" desc="필수 서류 수집">
+        <DocList docs={SCREENING_2_DOCS} customerId={id} docMap={docMap} />
+      </Card>
+
+      <Card title="3차 서류 (스크리닝 3)" desc="기기 사진 · 정보 수집">
+        <DocList docs={SCREENING_3_DOCS} customerId={id} docMap={docMap} />
+      </Card>
+
+      {/* 진행 단계 */}
+      <form action={updatePipelineAction} className="space-y-6">
         <Card title="실사 및 구조설계" desc="실사 일정 · 집행/렌탈가 · 내부 심의">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -305,19 +335,10 @@ export default async function CustomerDetailPage({
             type="submit"
             className="rounded-lg bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-brand-600"
           >
-            저장
+            진행 단계 저장
           </button>
         </div>
       </form>
-
-      {/* 서류 체크리스트 */}
-      <Card title="2차 서류 (스크리닝 2)" desc="필수 서류 수집">
-        <DocList docs={SCREENING_2_DOCS} customerId={id} docMap={docMap} />
-      </Card>
-
-      <Card title="3차 서류 (스크리닝 3)" desc="기기 사진 · 정보 수집">
-        <DocList docs={SCREENING_3_DOCS} customerId={id} docMap={docMap} />
-      </Card>
 
       {/* 위험 구역 */}
       <Card title="고객 삭제" desc="이 작업은 되돌릴 수 없습니다.">
