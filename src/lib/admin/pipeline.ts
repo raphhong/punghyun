@@ -71,22 +71,78 @@ export const MATURITY_RESULTS = [
 ] as const;
 
 // 단계별 서류 체크리스트 (2차 / 3차)
-export type DocItem = { key: string; label: string; category: StageKey };
+// hint: 고객 안내용 발급처·촬영 방법 설명
+export type DocItem = {
+  key: string;
+  label: string;
+  category: StageKey;
+  hint?: string;
+};
 
 export const SCREENING_2_DOCS: DocItem[] = [
-  { key: "business_registration", label: "사업자등록증", category: "screening_2" },
-  { key: "medical_license", label: "의료기관 개설 신고 증명", category: "screening_2" },
-  { key: "rep_id", label: "대표자 신분증", category: "screening_2" },
-  { key: "card_sales_6m", label: "최근 6개월 카드매출(카드사 발급)", category: "screening_2" },
-  { key: "tax_payment_cert", label: "국세 및 지방세 완납 증명서", category: "screening_2" },
-  { key: "income_cert_2y", label: "최근 2년 소득금액증명원", category: "screening_2" },
+  {
+    key: "business_registration",
+    label: "사업자등록증",
+    category: "screening_2",
+    hint: "홈택스(hometax.go.kr) 또는 관할 세무서에서 발급",
+  },
+  {
+    key: "medical_license",
+    label: "의료기관 개설 신고 증명",
+    category: "screening_2",
+    hint: "관할 보건소에서 발급 (해당 시)",
+  },
+  {
+    key: "rep_id",
+    label: "대표자 신분증",
+    category: "screening_2",
+    hint: "주민등록증 또는 운전면허증 사본",
+  },
+  {
+    key: "card_sales_6m",
+    label: "최근 6개월 카드매출",
+    category: "screening_2",
+    hint: "카드사 또는 여신금융협회에서 카드매출 내역 발급",
+  },
+  {
+    key: "tax_payment_cert",
+    label: "국세 및 지방세 완납 증명서",
+    category: "screening_2",
+    hint: "국세: 홈택스 / 지방세: 위택스(wetax.go.kr)에서 발급",
+  },
+  {
+    key: "income_cert_2y",
+    label: "최근 2년 소득금액증명원",
+    category: "screening_2",
+    hint: "홈택스(민원증명)에서 발급",
+  },
 ];
 
 export const SCREENING_3_DOCS: DocItem[] = [
-  { key: "device_nameplate", label: "기기 명판 사진", category: "screening_3" },
-  { key: "device_photos", label: "기기 상하좌우 사진", category: "screening_3" },
-  { key: "damage_photos", label: "파손부위 사진", category: "screening_3" },
-  { key: "device_list_excel", label: "기기정보 목록(엑셀)", category: "screening_3" },
+  {
+    key: "device_nameplate",
+    label: "기기 명판 사진",
+    category: "screening_3",
+    hint: "기기에 부착된 모델명·시리얼 명판을 선명하게 촬영",
+  },
+  {
+    key: "device_photos",
+    label: "기기 상하좌우 사진",
+    category: "screening_3",
+    hint: "기기 전체가 보이도록 상·하·좌·우 각 방향 촬영",
+  },
+  {
+    key: "damage_photos",
+    label: "파손부위 사진",
+    category: "screening_3",
+    hint: "파손·흠집 부위 근접 촬영 (없으면 생략 가능)",
+  },
+  {
+    key: "device_list_excel",
+    label: "기기정보 목록(엑셀)",
+    category: "screening_3",
+    hint: "모델명·수량·구매시기 등을 정리한 목록 파일",
+  },
 ];
 
 export const ALL_DOCS: DocItem[] = [...SCREENING_2_DOCS, ...SCREENING_3_DOCS];

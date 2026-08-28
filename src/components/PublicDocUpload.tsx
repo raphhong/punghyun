@@ -12,6 +12,7 @@ export function PublicDocUpload({
   docKey,
   category,
   label,
+  hint,
   done: initialDone,
   fileUrl,
 }: {
@@ -19,6 +20,7 @@ export function PublicDocUpload({
   docKey: string;
   category: string;
   label: string;
+  hint?: string;
   done: boolean;
   fileUrl?: string;
 }) {
@@ -99,6 +101,9 @@ export function PublicDocUpload({
           </span>
         )}
       </div>
+      {hint && (
+        <p className="mb-2 pl-7 text-xs leading-relaxed text-navy-500">{hint}</p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="file"

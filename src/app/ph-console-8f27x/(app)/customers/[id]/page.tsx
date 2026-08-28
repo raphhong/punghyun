@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { site } from "@/lib/site";
 import { ShareLink } from "@/components/admin/ShareLink";
+import { ShareMessage } from "@/components/admin/ShareMessage";
 import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { adminPath } from "@/lib/admin/config";
 import {
+  ALL_DOCS,
   HOSPITAL_TYPES,
   MATURITY_RESULTS,
   SCREENING_2_DOCS,
@@ -125,6 +127,24 @@ export default async function CustomerDetailPage({
   const proto = h.get("x-forwarded-proto") ?? "https";
   const baseUrl = host ? `${proto}://${host}` : site.url;
 
+  const shareUrl = `${baseUrl}/s/${customer.share_token}`;
+  // 영업자가 고객에게 그대로 보낼 수 있는 안내문구
+  const docLines = ALL_DOCS.map(
+    (d) => `· ${d.label}${d.hint ? ` (${d.hint})` : ""}`,
+  ).join("\n");
+  const shareMessage = `[풍현] 서류 제출 안내
+
+안녕하세요, 풍현입니다.
+아래 링크에서 기본정보 입력과 필수 서류 업로드를 부탁드립니다.
+휴대폰에서도 사진 촬영·업로드가 가능합니다.
+
+${shareUrl}
+
+[필요 서류]
+${docLines}
+
+문의사항은 담당자에게 연락 주세요. 감사합니다.`;
+
   return (
     <div className="space-y-6">
       {/* 헤더 */}
@@ -198,7 +218,15 @@ export default async function CustomerDetailPage({
         title="영업자 제출 링크"
         desc="이 링크를 영업자에게 전달하면, 로그인 없이 기본정보·서류를 올릴 수 있습니다."
       >
-        <ShareLink url={`${baseUrl}/s/${customer.share_token}`} />
+        <div className="space-y-4">
+          <ShareLink url={shareUrl} />
+          <div>
+            <p className="mb-2 text-xs font-semibold text-navy-600">
+              고객 안내 문구 (필요 서류 · 링크 포함)
+            </p>
+            <ShareMessage message={shareMessage} />
+          </div>
+        </div>
       </Card>
 
       {/* 기본 정보 */}

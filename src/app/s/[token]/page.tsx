@@ -189,6 +189,7 @@ function DocUpload({
             docKey={doc.key}
             category={doc.category}
             label={doc.label}
+            hint={doc.hint}
             done={!!row?.file_path}
             fileUrl={fileUrl}
           />
