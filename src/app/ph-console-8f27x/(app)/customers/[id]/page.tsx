@@ -9,7 +9,10 @@ import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { adminPath } from "@/lib/admin/config";
 import {
   ALL_DOCS,
+  CONTRACT_DOCS,
+  DELIVERY_DOCS,
   HOSPITAL_TYPES,
+  MATURITY_DOCS,
   MATURITY_RESULTS,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
@@ -313,6 +316,27 @@ ${docLines}
       <Card title="3차 서류 (스크리닝 3)" desc="기기 사진 · 정보 수집">
         <DocList docs={SCREENING_3_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
       </Card>
+
+      {/* 거래 진정성 증빙 서류 — 진정한 매매+임대차 입증 (내부 관리) */}
+      <div className="rounded-2xl border border-brand-200 bg-brand-50/40 p-4">
+        <h2 className="px-2 text-sm font-bold text-brand-800">
+          거래 진정성 증빙 서류
+        </h2>
+        <p className="mt-0.5 px-2 text-xs text-brand-700/80">
+          진정한 매매·임대차임을 입증하기 위한 내부 서류입니다. 생성·서명 후 보관본을 업로드하세요.
+        </p>
+        <div className="mt-3 space-y-4">
+          <Card title="① 계약 체결" desc="매매·임대차 분리 · 잔존가치 근거">
+            <DocList docs={CONTRACT_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
+          </Card>
+          <Card title="② 자산 인도 · 소유권 이전" desc="인도확인·검수·소유표시">
+            <DocList docs={DELIVERY_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
+          </Card>
+          <Card title="③ 만기 · 정산/재렌탈" desc="선택권·반납·비소구 입증">
+            <DocList docs={MATURITY_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
+          </Card>
+        </div>
+      </div>
 
       {/* 진행 단계 */}
       <form action={updatePipelineAction} className="space-y-6">
