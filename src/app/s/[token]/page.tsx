@@ -58,6 +58,20 @@ export default async function PublicSubmitPage({
     (docRows ?? []).map((d) => [d.doc_key, d as Partial<CustomerDocument>]),
   );
 
+  // 업로드된 파일 열람용 서명 URL (비공개 버킷 → 1시간 유효)
+  const filePaths = (docRows ?? [])
+    .map((d) => d.file_path)
+    .filter((p): p is string => !!p);
+  const signedMap = new Map<string, string>();
+  if (filePaths.length) {
+    const { data: signed } = await db.storage
+      .from("customer-docs")
+      .createSignedUrls(filePaths, 3600);
+    for (const s of signed ?? []) {
+      if (s.signedUrl && s.path) signedMap.set(s.path, s.signedUrl);
+    }
+  }
+
   const saveInfo = savePublicInfo.bind(null, token);
 
   return (
@@ -130,7 +144,7 @@ export default async function PublicSubmitPage({
             각 항목의 파일을 선택하고 업로드를 눌러 주세요.
           </p>
         </div>
-        <DocUpload docs={SCREENING_2_DOCS} docMap={docMap} token={token} />
+        <DocUpload docs={SCREENING_2_DOCS} docMap={docMap} signedMap={signedMap} token={token} />
       </section>
 
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
@@ -140,7 +154,7 @@ export default async function PublicSubmitPage({
             기기 사진 및 목록을 업로드해 주세요.
           </p>
         </div>
-        <DocUpload docs={SCREENING_3_DOCS} docMap={docMap} token={token} />
+        <DocUpload docs={SCREENING_3_DOCS} docMap={docMap} signedMap={signedMap} token={token} />
       </section>
 
       <p className="mt-8 text-center text-xs text-navy-400">
@@ -153,16 +167,21 @@ export default async function PublicSubmitPage({
 function DocUpload({
   docs,
   docMap,
+  signedMap,
   token,
 }: {
   docs: DocItem[];
   docMap: Map<string, Partial<CustomerDocument>>;
+  signedMap: Map<string, string>;
   token: string;
 }) {
   return (
     <ul className="space-y-3">
       {docs.map((doc) => {
         const row = docMap.get(doc.key);
+        const fileUrl = row?.file_path
+          ? signedMap.get(row.file_path)
+          : undefined;
         return (
           <PublicDocUpload
             key={doc.key}
@@ -171,6 +190,7 @@ function DocUpload({
             category={doc.category}
             label={doc.label}
             done={!!row?.file_path}
+            fileUrl={fileUrl}
           />
         );
       })}

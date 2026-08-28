@@ -13,12 +13,14 @@ export function PublicDocUpload({
   category,
   label,
   done: initialDone,
+  fileUrl,
 }: {
   token: string;
   docKey: string;
   category: string;
   label: string;
   done: boolean;
+  fileUrl?: string;
 }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
@@ -78,6 +80,24 @@ export function PublicDocUpload({
         </span>
         <span className="text-sm font-medium text-navy-800">{label}</span>
         {done && <span className="text-xs text-brand-600">업로드됨</span>}
+        {fileUrl && (
+          <span className="ml-auto inline-flex gap-2">
+            <a
+              href={fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-brand-600 hover:underline"
+            >
+              보기
+            </a>
+            <a
+              href={`${fileUrl}&download`}
+              className="text-xs font-medium text-navy-500 hover:underline"
+            >
+              다운로드
+            </a>
+          </span>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
