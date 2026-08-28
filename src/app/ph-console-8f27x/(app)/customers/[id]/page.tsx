@@ -95,6 +95,17 @@ export default async function CustomerDetailPage({
   const customer = customerRes.data;
   if (!customer) notFound();
 
+  // 담당 영업자 이름
+  let agentName: string | null = null;
+  if (customer.sales_agent_id) {
+    const { data: ag } = await supabase
+      .from("sales_agents")
+      .select("name")
+      .eq("id", customer.sales_agent_id)
+      .maybeSingle();
+    agentName = (ag as { name: string } | null)?.name ?? null;
+  }
+
   const docRows = docsRes.data;
 
   const docs = (docRows ?? []) as CustomerDocument[];
@@ -164,6 +175,11 @@ ${docLines}
               {stageLabel(stage)}
             </span>
             <span>{customer.source === "homepage" ? "공홈 인입" : "수동 등록"}</span>
+            {agentName && (
+              <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-medium text-brand-700">
+                담당 {agentName}
+              </span>
+            )}
           </p>
         </div>
 

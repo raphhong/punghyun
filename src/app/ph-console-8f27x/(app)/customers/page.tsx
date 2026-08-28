@@ -24,7 +24,7 @@ export default async function CustomersPage({
   let query = supabase
     .from("customers")
     .select(
-      "id, hospital_name, representative, phone, hospital_type, needed_funds, stage, source, intake_date, created_at",
+      "id, hospital_name, representative, phone, hospital_type, needed_funds, stage, source, intake_date, created_at, sales_agent_id",
     )
     .order("created_at", { ascending: false });
 
@@ -32,7 +32,17 @@ export default async function CustomersPage({
     query = query.eq("stage", stage);
   }
 
-  const { data: customers, error } = await query;
+  const [{ data: customers, error }, agentRes] = await Promise.all([
+    query,
+    supabase.from("sales_agents").select("id, name"),
+  ]);
+
+  const agentName = new Map(
+    ((agentRes.data as { id: string; name: string }[] | null) ?? []).map((a) => [
+      a.id,
+      a.name,
+    ]),
+  );
 
   const title = stage ? stageLabel(stage as StageKey) : "전체 고객";
 
@@ -70,6 +80,7 @@ export default async function CustomersPage({
                 <th className="px-4 py-3 font-medium">유형</th>
                 <th className="px-4 py-3 font-medium">필요자금</th>
                 <th className="px-4 py-3 font-medium">단계</th>
+                <th className="px-4 py-3 font-medium">담당 영업자</th>
                 <th className="px-4 py-3 font-medium">인입일</th>
                 <th className="px-4 py-3 font-medium">경로</th>
               </tr>
@@ -103,6 +114,11 @@ export default async function CustomersPage({
                     <span className="rounded-full bg-navy-100 px-2.5 py-1 text-xs font-medium text-navy-700">
                       {stageLabel(c.stage as StageKey)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-navy-600">
+                    {c.sales_agent_id
+                      ? agentName.get(c.sales_agent_id) ?? "-"
+                      : "-"}
                   </td>
                   <td className="px-4 py-3 text-navy-600">
                     {fmtDate(c.intake_date ?? null)}

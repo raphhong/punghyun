@@ -80,6 +80,22 @@ export function Sidebar({
           </Link>
         );
       })}
+
+      <p className="mt-4 px-3 text-xs font-semibold uppercase tracking-wide text-navy-500">
+        영업 조직
+      </p>
+      <Link
+        href={adminPath("agents")}
+        onClick={onNavigate}
+        className={cn(
+          "mt-1 rounded-lg px-3 py-2 text-sm transition-colors",
+          pathname === adminPath("agents")
+            ? "bg-navy-800 text-white"
+            : "text-navy-300 hover:bg-navy-800",
+        )}
+      >
+        영업자 관리
+      </Link>
     </nav>
   );
 }
