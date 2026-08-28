@@ -61,11 +61,12 @@ export default async function SalesDashboard() {
     <div className="space-y-6">
       {/* 요약 */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="총 건수(내 조직)" value={customers.length} />
-        <Stat label="하위 영업자" value={subAgents.length} />
+        <Stat label="총 건수(내 조직)" value={customers.length} href="/sales/customers" />
+        <Stat label="하위 영업자" value={subAgents.length} href="/sales/agents" />
         <Stat
           label="진행중"
           value={customers.filter((c) => c.stage !== "closed").length}
+          href="/sales/customers?status=active"
         />
       </div>
 
@@ -153,11 +154,35 @@ export default async function SalesDashboard() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-navy-100 bg-white p-5">
+function Stat({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value: number;
+  href?: string;
+}) {
+  const inner = (
+    <>
       <p className="text-xs text-navy-500">{label}</p>
       <p className="mt-1 text-2xl font-bold text-navy-900">{value}</p>
-    </div>
+    </>
+  );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="group flex flex-col rounded-2xl border border-navy-100 bg-white p-5 transition hover:border-brand-300 hover:shadow-sm"
+      >
+        {inner}
+        <span className="mt-2 text-xs font-medium text-brand-600 opacity-0 transition group-hover:opacity-100">
+          자세히 보기 →
+        </span>
+      </Link>
+    );
+  }
+  return (
+    <div className="rounded-2xl border border-navy-100 bg-white p-5">{inner}</div>
   );
 }
