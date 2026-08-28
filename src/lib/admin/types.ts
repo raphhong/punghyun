@@ -42,6 +42,10 @@ export type Customer = {
   unpaid: boolean;
 
   maturity_result: MaturityResult | null;
+  acquisition_price: number | null;
+  non_recourse_confirmed: boolean;
+  sale_proceeds: number | null;
+  sale_date: string | null;
 
   internal_memo: string | null;
 };

@@ -99,6 +99,10 @@ export async function updatePipeline(id: string, formData: FormData) {
     unpaid: bool(formData, "unpaid"),
 
     maturity_result: str(formData, "maturity_result"),
+    acquisition_price: num(formData, "acquisition_price"),
+    non_recourse_confirmed: bool(formData, "non_recourse_confirmed"),
+    sale_proceeds: num(formData, "sale_proceeds"),
+    sale_date: str(formData, "sale_date"),
     internal_memo: str(formData, "internal_memo"),
   };
 

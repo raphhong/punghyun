@@ -87,6 +87,7 @@ export type ContractView = {
   lessee: Party; // 임차인 = 고객
   saleAmount: string; // 매매대금
   rentAmount: string; // 월 렌탈료
+  acquisitionAmount: string; // 인수가
   periodStart: string;
   periodEnd: string;
   blank: string;
@@ -102,6 +103,7 @@ export function buildContractView(type: ContractType, c: Customer): ContractView
     lessee: customerParty("임차인 (이하 '을')", c),
     saleAmount: fmtWon(c.execution_amount),
     rentAmount: fmtWon(c.rental_price),
+    acquisitionAmount: fmtWon(c.acquisition_price),
     periodStart: fmtDate(c.contract_date),
     periodEnd: fmtDate(c.maturity_date),
     blank: BLANK,
@@ -224,7 +226,7 @@ export function rentalClauses(v: ContractView): Clause[] {
       title: "제9조 (만기 선택권)",
       body:
         "임차인은 기간 만료 전 임대인의 통지에 따라 ① 반납 ② 인수 ③ 재렌탈 중 하나를 선택한다. " +
-        "인수를 선택하는 경우 인수가는 금 " + v.blank + " (별도 산정)로 하며, 감가상각을 반영하여 " +
+        "인수를 선택하는 경우 인수가는 금 " + v.acquisitionAmount + " (별도 산정)로 하며, 감가상각을 반영하여 " +
         "회차가 경과할수록 낮아진다. 본 계약은 자동 연장되지 아니한다.",
     },
     {

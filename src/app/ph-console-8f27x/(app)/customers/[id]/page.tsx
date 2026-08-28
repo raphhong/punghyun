@@ -425,6 +425,26 @@ ${docLines}
                   </option>
                 ))}
               </select>
+              <div>
+                <label className={labelCls}>인수가 (원)</label>
+                <input name="acquisition_price" inputMode="numeric" defaultValue={customer.acquisition_price ?? ""} className={inputCls} placeholder="예: 50000000" />
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 border-t border-navy-100 pt-4">
+            <p className="text-sm font-medium text-navy-700">정산 (반납·회수 후 처분)</p>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelCls}>매각(처분) 대금 (원)</label>
+                <input name="sale_proceeds" inputMode="numeric" defaultValue={customer.sale_proceeds ?? ""} className={inputCls} placeholder="예: 40000000" />
+              </div>
+              <div>
+                <label className={labelCls}>매각(처분) 일자</label>
+                <input name="sale_date" type="date" defaultValue={customer.sale_date ?? ""} className={inputCls} />
+              </div>
+            </div>
+            <div className="mt-3">
+              <Check name="non_recourse_confirmed" label="완전 비소구 확인 (차액 미청구 · 거래 종료)" defaultChecked={customer.non_recourse_confirmed} />
             </div>
           </div>
         </Card>

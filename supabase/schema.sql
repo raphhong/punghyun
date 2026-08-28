@@ -77,6 +77,10 @@ create table if not exists public.customers (
 
   -- 만기처리
   maturity_result       maturity_result,-- 인수/반납/재렌탈
+  acquisition_price     bigint,         -- 인수가 (만기 인수 시 금액)
+  non_recourse_confirmed boolean not null default false, -- 완전 비소구 확인
+  sale_proceeds         bigint,         -- 매각(처분) 대금 실적
+  sale_date             date,           -- 매각(처분) 일자
 
   internal_memo         text            -- 내부메모
 );
