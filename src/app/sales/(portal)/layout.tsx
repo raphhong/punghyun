@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { LogoMark } from "@/components/Logo";
 import { getSessionAgent } from "@/lib/sales/agent";
 import { signOutAgent } from "../actions";
 
@@ -15,9 +16,7 @@ function StatusScreen({
   return (
     <div className="grid min-h-dvh place-items-center bg-navy-950 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-navy-800 bg-navy-900 p-8 text-center">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-navy-800 text-lg font-bold text-brand-300">
-          豊
-        </div>
+        <LogoMark size={48} tone="dark" className="mx-auto h-12 w-12" />
         <h1 className="mt-4 text-lg font-bold text-white">{title}</h1>
         <p className="mt-2 text-sm leading-relaxed text-navy-300">{message}</p>
         {email && <p className="mt-2 text-xs text-navy-500">{email}</p>}
@@ -76,9 +75,7 @@ export default async function PortalLayout({
       <header className="border-b border-navy-100 bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link href="/sales" className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-navy-900 text-sm font-bold text-brand-300">
-              豊
-            </span>
+            <LogoMark size={32} className="h-8 w-8" />
             <span className="text-sm font-bold text-navy-900">풍현 영업자 포털</span>
           </Link>
           <div className="flex items-center gap-3">

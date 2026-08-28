@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { useSearchParams } from "next/navigation";
+import { LogoMark } from "@/components/Logo";
 import { signInAgent } from "../actions";
 
 export default function SalesLoginPage() {
@@ -14,9 +15,7 @@ export default function SalesLoginPage() {
     <div className="grid min-h-dvh place-items-center bg-navy-950 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-navy-800 text-lg font-bold text-brand-300">
-            豊
-          </div>
+          <LogoMark size={48} tone="dark" className="mx-auto h-12 w-12" />
           <h1 className="mt-4 text-xl font-bold text-white">풍현 영업자 포털</h1>
           <p className="mt-1 text-sm text-navy-400">
             본사 승인 후 이용할 수 있습니다.
