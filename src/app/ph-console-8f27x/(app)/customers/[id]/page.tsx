@@ -7,6 +7,7 @@ import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
 import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { adminPath } from "@/lib/admin/config";
+import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
   ALL_DOCS,
   CONTRACT_DOCS,
@@ -327,6 +328,28 @@ ${docLines}
         </p>
         <div className="mt-3 space-y-4">
           <Card title="① 계약 체결" desc="매매·임대차 분리 · 잔존가치 근거">
+            <div className="mb-3 rounded-lg border border-brand-200 bg-white p-3">
+              <p className="mb-2 text-xs text-brand-700/80">
+                고객 정보로 초안을 생성합니다. 새 탭에서 인쇄/PDF 저장 후 서명본을 아래에 업로드하세요.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {CONTRACT_TYPES.map((ct) => (
+                  <a
+                    key={ct.type}
+                    href={adminPath(`contracts/${id}/${ct.type}`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={
+                      ct.core
+                        ? "rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
+                        : "rounded-lg border border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50"
+                    }
+                  >
+                    {ct.short} 생성
+                  </a>
+                ))}
+              </div>
+            </div>
             <DocList docs={CONTRACT_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
           </Card>
           <Card title="② 자산 인도 · 소유권 이전" desc="인도확인·검수·소유표시">
