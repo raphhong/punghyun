@@ -84,18 +84,16 @@ export default async function CustomerDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("*")
-    .eq("id", id)
-    .single<Customer>();
+  // 두 쿼리 모두 route param(id)에만 의존 → 병렬 실행으로 왕복 1회 절감.
+  const [customerRes, docsRes] = await Promise.all([
+    supabase.from("customers").select("*").eq("id", id).single<Customer>(),
+    supabase.from("customer_documents").select("*").eq("customer_id", id),
+  ]);
 
+  const customer = customerRes.data;
   if (!customer) notFound();
 
-  const { data: docRows } = await supabase
-    .from("customer_documents")
-    .select("*")
-    .eq("customer_id", id);
+  const docRows = docsRes.data;
 
   const docs = (docRows ?? []) as CustomerDocument[];
   const docMap = new Map(docs.map((d) => [d.doc_key, d]));

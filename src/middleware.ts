@@ -47,9 +47,10 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getUser()는 매 요청마다 Auth 서버로 네트워크 왕복이 발생.
+  // getClaims()는 JWKS로 JWT를 로컬 검증(가능 시)하여 왕복을 없앰.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const loginPath = `${ADMIN_BASE}/login`;
   const isLogin = pathname === loginPath;

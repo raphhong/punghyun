@@ -10,17 +10,22 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (!user) redirect(`${ADMIN_BASE}/login`);
+  // getUser() 네트워크 왕복 대신 로컬 JWT 검증 + 집계 쿼리를 병렬 실행.
+  const [claimsRes, countsRes] = await Promise.all([
+    supabase.auth.getClaims(),
+    supabase.from("customers").select("stage"),
+  ]);
+
+  const claims = claimsRes.data?.claims;
+  if (!claims) redirect(`${ADMIN_BASE}/login`);
+  const email = typeof claims.email === "string" ? claims.email : undefined;
 
   // 단계별 고객 수 집계
   const counts: Record<string, number> = { __all__: 0 };
   for (const s of STAGES) counts[s.key] = 0;
 
-  const { data } = await supabase.from("customers").select("stage");
+  const data = countsRes.data;
   if (data) {
     counts.__all__ = data.length;
     for (const row of data) {
@@ -30,7 +35,7 @@ export default async function AppLayout({
   }
 
   return (
-    <AdminShell email={user.email} counts={counts}>
+    <AdminShell email={email} counts={counts}>
       {children}
     </AdminShell>
   );
