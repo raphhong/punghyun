@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { adminPath } from "@/lib/admin/config";
 import { HOSPITAL_TYPES } from "@/lib/admin/pipeline";
+import { SubmitButton } from "@/components/admin/SubmitButton";
 import { createCustomer } from "../actions";
 
 export const metadata = { title: "고객 추가" };
@@ -134,12 +135,12 @@ export default function NewCustomerPage() {
           >
             취소
           </Link>
-          <button
-            type="submit"
+          <SubmitButton
+            pendingText="등록 중…"
             className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
           >
             등록
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </div>
