@@ -130,3 +130,142 @@ export async function createSalesCustomer(formData: FormData) {
   revalidatePath("/sales");
   redirect(`/sales/customers/${data.id}`);
 }
+
+// ── 서브트리 고객 검증 헬퍼 ──
+// RLS(내 서브트리만 select 가능)로 접근 권한을 확인한 뒤, 이후 쓰기는 service-role로 수행.
+async function assertSubtreeCustomer(
+  id: string,
+): Promise<{ id: string; stage: string; sales_agent_id: string | null }> {
+  const { agent } = await getSessionAgent();
+  if (!agent || agent.status !== "approved") {
+    throw new Error("승인된 영업자만 이용할 수 있습니다.");
+  }
+  const supabase = await createClient(); // RLS: 내 서브트리 고객만 조회됨
+  const { data } = await supabase
+    .from("customers")
+    .select("id, stage, sales_agent_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) throw new Error("권한이 없거나 존재하지 않는 고객입니다.");
+  return data as { id: string; stage: string; sales_agent_id: string | null };
+}
+
+// ── 고객 기본 정보 수정 (내 조직) ──
+export async function updateSalesCustomer(id: string, formData: FormData) {
+  await assertSubtreeCustomer(id);
+
+  const patch = {
+    hospital_name: str(formData, "hospital_name"),
+    representative: str(formData, "representative"),
+    phone: str(formData, "phone"),
+    email: str(formData, "email"),
+    hospital_type: str(formData, "hospital_type"),
+    needed_funds: str(formData, "needed_funds"),
+    intake_date: str(formData, "intake_date"),
+  };
+
+  const db = createAdminClient();
+  const { error } = await db.from("customers").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/sales");
+  revalidatePath(`/sales/customers/${id}`);
+}
+
+// ── 고객 삭제 (인입 단계에서만) ──
+export async function deleteSalesCustomer(formData: FormData) {
+  const id = String(formData.get("id"));
+  const c = await assertSubtreeCustomer(id);
+  if (c.stage !== "intake") {
+    throw new Error("본사 처리가 시작되어 삭제할 수 없습니다. (인입 단계만 삭제 가능)");
+  }
+
+  const db = createAdminClient();
+  // 업로드된 서류 파일 정리 (best-effort)
+  const { data: files } = await db.storage.from("customer-docs").list(id);
+  if (files?.length) {
+    await db.storage.from("customer-docs").remove(files.map((f) => `${id}/${f.name}`));
+  }
+  // 고객 삭제 (customer_documents 는 on delete cascade)
+  const { error } = await db.from("customers").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/sales");
+  redirect("/sales");
+}
+
+// ── 서류 업로드 URL 발급 (영업자, service-role) ──
+export async function salesCreateDocUploadUrl(
+  customerId: string,
+  docKey: string,
+  filename: string,
+): Promise<{ path: string; token: string } | { error: string }> {
+  try {
+    await assertSubtreeCustomer(customerId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "권한 오류" };
+  }
+  const db = createAdminClient();
+  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
+  const path = `${customerId}/${docKey}-${Date.now()}.${ext}`;
+  const { data, error } = await db.storage
+    .from("customer-docs")
+    .createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "URL 발급 실패" };
+  return { path: data.path, token: data.token };
+}
+
+// ── 업로드 완료 후 DB 기록 (영업자) ──
+export async function salesRecordDocUpload(
+  customerId: string,
+  docKey: string,
+  category: string,
+  path: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    await assertSubtreeCustomer(customerId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "권한 오류" };
+  }
+  const db = createAdminClient();
+  const { error } = await db.from("customer_documents").upsert(
+    {
+      customer_id: customerId,
+      doc_key: docKey,
+      category,
+      checked: true,
+      file_path: path,
+      uploaded_at: new Date().toISOString(),
+    },
+    { onConflict: "customer_id,doc_key" },
+  );
+  if (error) return { error: error.message };
+  revalidatePath(`/sales/customers/${customerId}`);
+  return { ok: true };
+}
+
+// ── 서류 삭제 (영업자) ──
+export async function salesDeleteDocument(formData: FormData) {
+  const customerId = String(formData.get("customer_id"));
+  const docKey = String(formData.get("doc_key"));
+  await assertSubtreeCustomer(customerId);
+
+  const db = createAdminClient();
+  const { data: row } = await db
+    .from("customer_documents")
+    .select("file_path")
+    .eq("customer_id", customerId)
+    .eq("doc_key", docKey)
+    .maybeSingle();
+
+  if (row?.file_path) {
+    await db.storage.from("customer-docs").remove([row.file_path]);
+  }
+  await db
+    .from("customer_documents")
+    .delete()
+    .eq("customer_id", customerId)
+    .eq("doc_key", docKey);
+
+  revalidatePath(`/sales/customers/${customerId}`);
+}

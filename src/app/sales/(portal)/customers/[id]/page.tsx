@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import {
   ALL_DOCS,
+  HOSPITAL_TYPES,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
   stageLabel,
@@ -12,6 +13,16 @@ import {
 import type { Customer, CustomerDocument } from "@/lib/admin/types";
 import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
+import { SalesDocUpload } from "@/components/sales/SalesDocUpload";
+import {
+  deleteSalesCustomer,
+  salesDeleteDocument,
+  updateSalesCustomer,
+} from "@/app/sales/actions";
+
+const inputCls =
+  "w-full rounded-lg border border-navy-200 px-3 py-2 text-sm outline-none focus:border-brand-400";
+const labelCls = "text-xs text-navy-500";
 
 export default async function SalesCustomerDetail({
   params,
@@ -88,26 +99,53 @@ ${docLines}
         </Link>
       </div>
 
-      {/* 기본 정보 */}
-      <Card title="기본 정보">
-        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-          <Field label="대표자" value={customer.representative} />
-          <Field label="연락처" value={customer.phone} />
-          <Field label="이메일" value={customer.email} />
-          <Field
-            label="고객 유형"
-            value={
-              customer.hospital_type === "individual"
-                ? "개인"
-                : customer.hospital_type === "corporate"
-                  ? "법인"
-                  : null
-            }
-          />
-          <Field label="필요자금" value={customer.needed_funds} />
-          <Field label="인입일자" value={customer.intake_date} />
-        </dl>
-      </Card>
+      {/* 기본 정보 (수정 가능) */}
+      <form action={updateSalesCustomer.bind(null, customer.id)}>
+        <Card title="기본 정보" desc="내용을 수정한 뒤 저장하세요.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelCls}>상호(업체명)</label>
+              <input name="hospital_name" defaultValue={customer.hospital_name ?? ""} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>대표자</label>
+              <input name="representative" defaultValue={customer.representative ?? ""} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>연락처</label>
+              <input name="phone" defaultValue={customer.phone ?? ""} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>이메일</label>
+              <input name="email" defaultValue={customer.email ?? ""} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>고객 유형</label>
+              <select name="hospital_type" defaultValue={customer.hospital_type ?? ""} className={inputCls}>
+                <option value="">선택</option>
+                {HOSPITAL_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>필요자금</label>
+              <input name="needed_funds" defaultValue={customer.needed_funds ?? ""} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>인입일자</label>
+              <input name="intake_date" type="date" defaultValue={customer.intake_date ?? ""} className={inputCls} />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
+              저장
+            </button>
+          </div>
+        </Card>
+      </form>
 
       {/* 서류 제출 링크 */}
       <Card
@@ -127,11 +165,36 @@ ${docLines}
 
       {/* 서류 현황 */}
       <Card title="2차 스크리닝 서류">
-        <DocList docs={SCREENING_2_DOCS} docMap={docMap} signedMap={signedMap} />
+        <DocList
+          docs={SCREENING_2_DOCS}
+          docMap={docMap}
+          signedMap={signedMap}
+          customerId={customer.id}
+        />
       </Card>
       <Card title="3차 스크리닝 서류">
-        <DocList docs={SCREENING_3_DOCS} docMap={docMap} signedMap={signedMap} />
+        <DocList
+          docs={SCREENING_3_DOCS}
+          docMap={docMap}
+          signedMap={signedMap}
+          customerId={customer.id}
+        />
       </Card>
+
+      {/* 고객 삭제 (인입 단계에서만) */}
+      {customer.stage === "intake" && (
+        <Card
+          title="고객 삭제"
+          desc="본사 처리가 시작되기 전(인입 단계)에만 삭제할 수 있습니다. 업로드된 서류도 함께 삭제됩니다."
+        >
+          <form action={deleteSalesCustomer}>
+            <input type="hidden" name="id" value={customer.id} />
+            <button className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100">
+              이 고객 삭제
+            </button>
+          </form>
+        </Card>
+      )}
     </div>
   );
 }
@@ -140,10 +203,12 @@ function DocList({
   docs,
   docMap,
   signedMap,
+  customerId,
 }: {
   docs: DocItem[];
   docMap: Map<string, CustomerDocument>;
   signedMap: Map<string, string>;
+  customerId: string;
 }) {
   return (
     <ul className="space-y-2">
@@ -154,7 +219,7 @@ function DocList({
         return (
           <li
             key={doc.key}
-            className="flex items-center gap-2 rounded-xl border border-navy-100 px-3 py-2.5"
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-navy-100 px-3 py-2.5"
           >
             <span
               className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
@@ -164,24 +229,39 @@ function DocList({
               ✓
             </span>
             <span className="text-sm text-navy-800">{doc.label}</span>
-            {url && (
-              <span className="ml-auto inline-flex gap-2">
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-medium text-brand-600 hover:underline"
-                >
-                  보기
-                </a>
-                <a
-                  href={`${url}&download`}
-                  className="text-xs font-medium text-navy-500 hover:underline"
-                >
-                  다운로드
-                </a>
-              </span>
-            )}
+            <div className="ml-auto flex items-center gap-2">
+              {url && (
+                <span className="inline-flex gap-2">
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-medium text-brand-600 hover:underline"
+                  >
+                    보기
+                  </a>
+                  <a
+                    href={`${url}&download`}
+                    className="text-xs font-medium text-navy-500 hover:underline"
+                  >
+                    다운로드
+                  </a>
+                  <form action={salesDeleteDocument}>
+                    <input type="hidden" name="customer_id" value={customerId} />
+                    <input type="hidden" name="doc_key" value={doc.key} />
+                    <button className="text-xs font-medium text-red-500 hover:underline">
+                      삭제
+                    </button>
+                  </form>
+                </span>
+              )}
+              <SalesDocUpload
+                customerId={customerId}
+                docKey={doc.key}
+                category={doc.category}
+                hasFile={done}
+              />
+            </div>
           </li>
         );
       })}
@@ -204,14 +284,5 @@ function Card({
       {desc && <p className="mb-4 mt-1 text-xs text-navy-500">{desc}</p>}
       <div className={desc ? "" : "mt-4"}>{children}</div>
     </section>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div>
-      <dt className="text-xs text-navy-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-navy-900">{value ?? "-"}</dd>
-    </div>
   );
 }
