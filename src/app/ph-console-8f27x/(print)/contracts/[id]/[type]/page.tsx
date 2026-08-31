@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Customer } from "@/lib/admin/types";
-import { PrintButton } from "@/components/admin/PrintButton";
+import { EditableContract } from "@/components/admin/EditableContract";
 import {
   buildContractView,
   clausesFor,
@@ -39,16 +39,7 @@ export default async function ContractPrintPage({
         }
       `}</style>
 
-      {/* 화면 전용 상단 바 */}
-      <div className="no-print sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-6 py-3">
-        <span className="text-sm text-neutral-500">
-          {v.meta.title} · {customer.hospital_name ?? "(미입력)"}
-        </span>
-        <PrintButton />
-      </div>
-
-      {/* A4 문서 */}
-      <div className="sheet mx-auto my-6 max-w-[210mm] bg-white px-[16mm] py-[12mm] shadow-sm print:my-0 print:shadow-none">
+      <EditableContract subtitle={`${v.meta.title} · ${customer.hospital_name ?? "(미입력)"}`}>
         <h1 className="mb-1 text-center text-2xl font-bold tracking-wide">{v.meta.title}</h1>
         <p className="mb-8 text-center text-xs text-neutral-500">
           {isDoc
@@ -98,7 +89,7 @@ export default async function ContractPrintPage({
         <p className="mt-10 border-t border-dashed border-neutral-300 pt-3 text-center text-[11px] text-neutral-400">
           ⚠️ 본 문서는 실무 초안이며, 실제 사용 전 반드시 변호사 검수를 받으시기 바랍니다.
         </p>
-      </div>
+      </EditableContract>
     </>
   );
 }
