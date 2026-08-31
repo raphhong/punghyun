@@ -6,6 +6,7 @@ import {
   HOSPITAL_TYPES,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
+  docsForType,
   type DocItem,
 } from "@/lib/admin/pipeline";
 import type { CustomerDocument } from "@/lib/admin/types";
@@ -144,7 +145,7 @@ export default async function PublicSubmitPage({
             각 항목의 파일을 선택하고 업로드를 눌러 주세요.
           </p>
         </div>
-        <DocUpload docs={SCREENING_2_DOCS} docMap={docMap} signedMap={signedMap} token={token} />
+        <DocUpload docs={docsForType(SCREENING_2_DOCS, customer.hospital_type)} docMap={docMap} signedMap={signedMap} token={token} />
       </section>
 
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">

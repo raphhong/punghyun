@@ -18,6 +18,7 @@ import {
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
   STAGES,
+  docsForType,
   nextStage,
   prevStage,
   stageLabel,
@@ -143,10 +144,11 @@ export default async function CustomerDetailPage({
   const baseUrl = host ? `${proto}://${host}` : site.url;
 
   const shareUrl = `${baseUrl}/s/${customer.share_token}`;
+  const screening2 = docsForType(SCREENING_2_DOCS, customer.hospital_type);
   // 영업자가 고객에게 그대로 보낼 수 있는 안내문구
-  const docLines = ALL_DOCS.map(
-    (d) => `· ${d.label}${d.hint ? ` (${d.hint})` : ""}`,
-  ).join("\n");
+  const docLines = docsForType(ALL_DOCS, customer.hospital_type)
+    .map((d) => `· ${d.label}${d.hint ? ` (${d.hint})` : ""}`)
+    .join("\n");
   const shareMessage = `[풍현] 서류 제출 안내
 
 안녕하세요, 풍현입니다.
@@ -311,7 +313,7 @@ ${docLines}
 
       {/* 서류 체크리스트 (기본정보 다음) */}
       <Card title="2차 서류 (스크리닝 2)" desc="필수 서류 수집">
-        <DocList docs={SCREENING_2_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
+        <DocList docs={screening2} customerId={id} docMap={docMap} signedMap={signedMap} />
       </Card>
 
       <Card title="3차 서류 (스크리닝 3)" desc="기기 사진 · 정보 수집">

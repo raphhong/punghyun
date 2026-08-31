@@ -77,7 +77,17 @@ export type DocItem = {
   label: string;
   category: StageKey;
   hint?: string;
+  // 법인 고객에게만 필요한 서류 (개인 고객에게는 표시하지 않음)
+  corporateOnly?: boolean;
 };
+
+// 고객 유형에 따라 필요한 서류만 필터 (법인 전용 서류는 법인 고객만)
+export function docsForType<T extends DocItem>(
+  docs: T[],
+  hospitalType: string | null | undefined,
+): T[] {
+  return docs.filter((d) => !d.corporateOnly || hospitalType === "corporate");
+}
 
 export const SCREENING_2_DOCS: DocItem[] = [
   {
@@ -85,6 +95,13 @@ export const SCREENING_2_DOCS: DocItem[] = [
     label: "사업자등록증",
     category: "screening_2",
     hint: "홈택스(hometax.go.kr) 또는 관할 세무서에서 발급",
+  },
+  {
+    key: "corporate_registration",
+    label: "법인 등기부등본 (말소사항 포함)",
+    category: "screening_2",
+    hint: "인터넷등기소(iros.go.kr)에서 발급 · 말소사항 포함 선택",
+    corporateOnly: true,
   },
   {
     key: "medical_license",

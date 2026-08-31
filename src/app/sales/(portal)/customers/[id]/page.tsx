@@ -7,6 +7,7 @@ import {
   HOSPITAL_TYPES,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
+  docsForType,
   stageLabel,
   type DocItem,
 } from "@/lib/admin/pipeline";
@@ -64,9 +65,10 @@ export default async function SalesCustomerDetail({
   const baseUrl = host ? `${proto}://${host}` : "";
   const shareUrl = `${baseUrl}/s/${customer.share_token}`;
 
-  const docLines = ALL_DOCS.map(
-    (d) => `· ${d.label}${d.hint ? ` (${d.hint})` : ""}`,
-  ).join("\n");
+  const screening2 = docsForType(SCREENING_2_DOCS, customer.hospital_type);
+  const docLines = docsForType(ALL_DOCS, customer.hospital_type)
+    .map((d) => `· ${d.label}${d.hint ? ` (${d.hint})` : ""}`)
+    .join("\n");
   const shareMessage = `[풍현] 서류 제출 안내
 
 안녕하세요, 풍현입니다.
@@ -166,7 +168,7 @@ ${docLines}
       {/* 서류 현황 */}
       <Card title="2차 스크리닝 서류">
         <DocList
-          docs={SCREENING_2_DOCS}
+          docs={screening2}
           docMap={docMap}
           signedMap={signedMap}
           customerId={customer.id}
