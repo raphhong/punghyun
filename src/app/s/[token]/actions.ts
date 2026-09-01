@@ -91,6 +91,138 @@ export async function recordDocUpload(
   return { ok: true };
 }
 
+// ── 기기 단위 등록 (영업자 · 여러 기계를 한 번에) ────
+export async function addDevice(
+  token: string,
+): Promise<{ id: string } | { error: string }> {
+  const customer = await customerByToken(token);
+  if (!customer) return { error: "유효하지 않은 링크입니다." };
+  const db = createAdminClient();
+  const { data, error } = await db
+    .from("customer_devices")
+    .insert({ customer_id: customer.id })
+    .select("id")
+    .single();
+  if (error || !data) return { error: error?.message ?? "기기 추가 실패" };
+  revalidatePath(`/s/${token}`);
+  return { id: data.id };
+}
+
+export async function saveDevice(
+  token: string,
+  device_id: string,
+  model_name: string | null,
+  quantity: number | null,
+): Promise<{ ok: true } | { error: string }> {
+  const customer = await customerByToken(token);
+  if (!customer) return { error: "유효하지 않은 링크입니다." };
+  const db = createAdminClient();
+  const { error } = await db
+    .from("customer_devices")
+    .update({ model_name, quantity })
+    .eq("id", device_id)
+    .eq("customer_id", customer.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/s/${token}`);
+  return { ok: true };
+}
+
+export async function deleteDevice(
+  token: string,
+  device_id: string,
+): Promise<{ ok: true } | { error: string }> {
+  const customer = await customerByToken(token);
+  if (!customer) return { error: "유효하지 않은 링크입니다." };
+  const db = createAdminClient();
+  const { data: rows } = await db
+    .from("customer_documents")
+    .select("file_path")
+    .eq("customer_id", customer.id)
+    .eq("device_id", device_id);
+  const paths = (rows ?? [])
+    .map((r) => r.file_path)
+    .filter((p): p is string => !!p);
+  if (paths.length) {
+    await db.storage.from("customer-docs").remove(paths);
+  }
+  const { error } = await db
+    .from("customer_devices")
+    .delete()
+    .eq("id", device_id)
+    .eq("customer_id", customer.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/s/${token}`);
+  return { ok: true };
+}
+
+export async function createDevicePhotoUrl(
+  token: string,
+  device_id: string,
+  filename: string,
+): Promise<{ path: string; token: string } | { error: string }> {
+  const customer = await customerByToken(token);
+  if (!customer) return { error: "유효하지 않은 링크입니다." };
+  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
+  const path = `${customer.id}/device_photo_${device_id}_${Date.now()}.${ext}`;
+  const db = createAdminClient();
+  const { data, error } = await db.storage
+    .from("customer-docs")
+    .createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "URL 발급 실패" };
+  return { path: data.path, token: data.token };
+}
+
+export async function recordDevicePhoto(
+  token: string,
+  device_id: string,
+  path: string,
+): Promise<{ ok: true } | { error: string }> {
+  const customer = await customerByToken(token);
+  if (!customer) return { error: "유효하지 않은 링크입니다." };
+  const db = createAdminClient();
+  const doc_key = `device_photo_${device_id}_${Date.now()}_${Math.random()
+    .toString(36)
+    .slice(2, 7)}`;
+  const { error } = await db.from("customer_documents").insert({
+    customer_id: customer.id,
+    device_id,
+    doc_key,
+    category: "screening_3",
+    checked: true,
+    file_path: path,
+    uploaded_at: new Date().toISOString(),
+  });
+  if (error) return { error: error.message };
+  revalidatePath(`/s/${token}`);
+  return { ok: true };
+}
+
+export async function deleteDevicePhoto(
+  token: string,
+  doc_key: string,
+): Promise<{ ok: true } | { error: string }> {
+  const customer = await customerByToken(token);
+  if (!customer) return { error: "유효하지 않은 링크입니다." };
+  const db = createAdminClient();
+  const { data: row } = await db
+    .from("customer_documents")
+    .select("file_path")
+    .eq("customer_id", customer.id)
+    .eq("doc_key", doc_key)
+    .maybeSingle();
+  if (row?.file_path) {
+    await db.storage.from("customer-docs").remove([row.file_path]);
+  }
+  const { error } = await db
+    .from("customer_documents")
+    .delete()
+    .eq("customer_id", customer.id)
+    .eq("doc_key", doc_key);
+  if (error) return { error: error.message };
+  revalidatePath(`/s/${token}`);
+  return { ok: true };
+}
+
 // ── 서류 파일 삭제 (영업자) ──────────────────────
 export async function deleteDocByToken(
   token: string,

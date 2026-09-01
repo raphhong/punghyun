@@ -263,6 +263,128 @@ export async function deleteDocument(formData: FormData) {
   refresh(customer_id);
 }
 
+// ── 기기 단위 등록 (여러 기계를 한 번에) ──────────
+export async function addDevice(
+  customer_id: string,
+): Promise<{ id: string } | { error: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("customer_devices")
+    .insert({ customer_id })
+    .select("id")
+    .single();
+  if (error || !data) return { error: error?.message ?? "기기 추가 실패" };
+  refresh(customer_id);
+  return { id: data.id };
+}
+
+export async function saveDevice(
+  customer_id: string,
+  device_id: string,
+  model_name: string | null,
+  quantity: number | null,
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("customer_devices")
+    .update({ model_name, quantity })
+    .eq("id", device_id)
+    .eq("customer_id", customer_id);
+  if (error) return { error: error.message };
+  refresh(customer_id);
+  return { ok: true };
+}
+
+export async function deleteDevice(
+  customer_id: string,
+  device_id: string,
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  // 연결된 사진 스토리지 파일 정리
+  const { data: rows } = await supabase
+    .from("customer_documents")
+    .select("file_path")
+    .eq("customer_id", customer_id)
+    .eq("device_id", device_id);
+  const paths = (rows ?? [])
+    .map((r) => r.file_path)
+    .filter((p): p is string => !!p);
+  if (paths.length) {
+    await supabase.storage.from("customer-docs").remove(paths);
+  }
+  // 기기 삭제 → customer_documents.device_id ON DELETE CASCADE로 사진 행 제거
+  const { error } = await supabase
+    .from("customer_devices")
+    .delete()
+    .eq("id", device_id)
+    .eq("customer_id", customer_id);
+  if (error) return { error: error.message };
+  refresh(customer_id);
+  return { ok: true };
+}
+
+export async function createDevicePhotoUrl(
+  customer_id: string,
+  device_id: string,
+  filename: string,
+): Promise<{ path: string; token: string } | { error: string }> {
+  const supabase = await createClient();
+  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
+  const path = `${customer_id}/device_photo_${device_id}_${Date.now()}.${ext}`;
+  const { data, error } = await supabase.storage
+    .from("customer-docs")
+    .createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "URL 발급 실패" };
+  return { path: data.path, token: data.token };
+}
+
+export async function recordDevicePhoto(
+  customer_id: string,
+  device_id: string,
+  path: string,
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const doc_key = `device_photo_${device_id}_${Date.now()}_${Math.random()
+    .toString(36)
+    .slice(2, 7)}`;
+  const { error } = await supabase.from("customer_documents").insert({
+    customer_id,
+    device_id,
+    doc_key,
+    category: "screening_3",
+    checked: true,
+    file_path: path,
+    uploaded_at: new Date().toISOString(),
+  });
+  if (error) return { error: error.message };
+  refresh(customer_id);
+  return { ok: true };
+}
+
+export async function deleteDevicePhoto(
+  customer_id: string,
+  doc_key: string,
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("customer_documents")
+    .select("file_path")
+    .eq("customer_id", customer_id)
+    .eq("doc_key", doc_key)
+    .maybeSingle();
+  if (row?.file_path) {
+    await supabase.storage.from("customer-docs").remove([row.file_path]);
+  }
+  const { error } = await supabase
+    .from("customer_documents")
+    .delete()
+    .eq("customer_id", customer_id)
+    .eq("doc_key", doc_key);
+  if (error) return { error: error.message };
+  refresh(customer_id);
+  return { ok: true };
+}
+
 // ── 고객 삭제 ───────────────────────────────────
 export async function deleteCustomer(formData: FormData) {
   const id = String(formData.get("id"));

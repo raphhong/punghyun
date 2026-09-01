@@ -11,13 +11,15 @@ import {
 } from "@/lib/admin/pipeline";
 import type { CustomerDocument } from "@/lib/admin/types";
 import { PublicDocUpload } from "@/components/PublicDocUpload";
-import { MultiPhotoUpload } from "@/components/MultiPhotoUpload";
-import { PublicPhotoList } from "@/components/PublicPhotoList";
+import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
 import {
-  createDocUploadUrl,
-  recordDocUpload,
-  deleteDocByToken,
   savePublicInfo,
+  addDevice,
+  saveDevice,
+  deleteDevice,
+  createDevicePhotoUrl,
+  recordDevicePhoto,
+  deleteDevicePhoto,
 } from "./actions";
 
 export const metadata: Metadata = {
@@ -59,8 +61,15 @@ export default async function PublicSubmitPage({
 
   const { data: docRows } = await db
     .from("customer_documents")
-    .select("doc_key, checked, file_path")
+    .select("doc_key, checked, file_path, device_id")
     .eq("customer_id", customer.id);
+
+  const { data: deviceRows } = await db
+    .from("customer_devices")
+    .select("id, model_name, quantity, sort_order, created_at")
+    .eq("customer_id", customer.id)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
 
   const docMap = new Map(
     (docRows ?? []).map((d) => [d.doc_key, d as Partial<CustomerDocument>]),
@@ -80,18 +89,33 @@ export default async function PublicSubmitPage({
     }
   }
 
-  // 여러 장 올린 기기 사진(device_photo_*) 목록
-  const photoItems = (docRows ?? [])
-    .filter((d) => d.doc_key.startsWith("device_photo_") && d.file_path)
-    .map((d, i) => ({
-      key: d.doc_key,
-      label: `기기 사진 ${i + 1}`,
-      url: d.file_path ? (signedMap.get(d.file_path) ?? "") : "",
-    }))
-    .filter((it) => it.url);
+  // 기기별 사진 그룹핑 (device_id 기준)
+  const photosByDevice = new Map<string, { key: string; url: string }[]>();
+  for (const d of docRows ?? []) {
+    if (!d.device_id || !d.file_path) continue;
+    const url = signedMap.get(d.file_path);
+    if (!url) continue;
+    const arr = photosByDevice.get(d.device_id) ?? [];
+    arr.push({ key: d.doc_key, url });
+    photosByDevice.set(d.device_id, arr);
+  }
+  const deviceViews: DeviceView[] = (deviceRows ?? []).map((d) => ({
+    id: d.id,
+    model_name: d.model_name,
+    quantity: d.quantity,
+    photos: photosByDevice.get(d.id) ?? [],
+  }));
+
+  const deviceActions = {
+    addDevice,
+    saveDevice,
+    deleteDevice,
+    createPhotoUrl: createDevicePhotoUrl,
+    recordPhoto: recordDevicePhoto,
+    deletePhoto: deleteDevicePhoto,
+  };
 
   const saveInfo = savePublicInfo.bind(null, token);
-  const deletePhoto = deleteDocByToken.bind(null, token);
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-xl px-4 py-8 sm:py-12">
@@ -168,21 +192,28 @@ export default async function PublicSubmitPage({
 
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
         <div>
-          <h2 className="text-base font-semibold text-navy-900">기기 사진·정보</h2>
+          <h2 className="text-base font-semibold text-navy-900">판매할 기기</h2>
           <p className="mt-0.5 text-sm text-navy-500">
-            여러 기계를 한 번에 촬영해 올릴 수 있습니다.
+            판매·렌탈할 기계를 한 대씩 추가하고, 각 기기의 사진을 올려 주세요.
+            여러 대를 한 번에 등록할 수 있습니다.
           </p>
         </div>
-        <MultiPhotoUpload
-          id={token}
-          category="screening_3"
-          createUrl={createDocUploadUrl}
-          record={recordDocUpload}
+        <DeviceManager id={token} devices={deviceViews} actions={deviceActions} />
+      </section>
+
+      <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
+        <div>
+          <h2 className="text-base font-semibold text-navy-900">기기정보 목록</h2>
+          <p className="mt-0.5 text-sm text-navy-500">
+            전체 기기 목록을 정리한 파일이 있으면 함께 올려 주세요. (선택)
+          </p>
+        </div>
+        <DocUpload
+          docs={SCREENING_3_DOCS.filter((d) => d.key === "device_list_excel")}
+          docMap={docMap}
+          signedMap={signedMap}
+          token={token}
         />
-        {photoItems.length > 0 && (
-          <PublicPhotoList items={photoItems} deleteAction={deletePhoto} />
-        )}
-        <DocUpload docs={SCREENING_3_DOCS} docMap={docMap} signedMap={signedMap} token={token} />
       </section>
 
       <p className="mt-8 text-center text-xs text-navy-400">

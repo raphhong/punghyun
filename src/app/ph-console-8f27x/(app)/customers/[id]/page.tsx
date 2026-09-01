@@ -7,7 +7,7 @@ import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
 import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { DocGallery, type GalleryItem } from "@/components/admin/DocGallery";
-import { MultiPhotoUpload } from "@/components/MultiPhotoUpload";
+import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
 import { adminPath } from "@/lib/admin/config";
 import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
@@ -29,15 +29,19 @@ import {
 } from "@/lib/admin/pipeline";
 import type { Customer, CustomerDocument } from "@/lib/admin/types";
 import {
-  createDocUploadUrl,
   deleteCustomer,
   deleteDocument,
   moveStage,
-  recordDocUpload,
   setStage,
   toggleDocument,
   updateBasic,
   updatePipeline,
+  addDevice,
+  saveDevice,
+  deleteDevice,
+  createDevicePhotoUrl,
+  recordDevicePhoto,
+  deleteDevicePhoto,
 } from "../actions";
 
 export const metadata = { title: "고객 상세" };
@@ -96,10 +100,16 @@ export default async function CustomerDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  // 두 쿼리 모두 route param(id)에만 의존 → 병렬 실행으로 왕복 1회 절감.
-  const [customerRes, docsRes] = await Promise.all([
+  // 세 쿼리 모두 route param(id)에만 의존 → 병렬 실행으로 왕복 절감.
+  const [customerRes, docsRes, devicesRes] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).single<Customer>(),
     supabase.from("customer_documents").select("*").eq("customer_id", id),
+    supabase
+      .from("customer_devices")
+      .select("id, model_name, quantity, sort_order, created_at")
+      .eq("customer_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
 
   const customer = customerRes.data;
@@ -159,6 +169,31 @@ export default async function CustomerDetailPage({
       return { key: row.doc_key, label, url, isImage: IMG_EXT.has(ext) };
     })
     .filter((x): x is GalleryItem => x !== null);
+
+  // 기기별 사진 그룹핑 (device_id 기준) + 기기 목록
+  const photosByDevice = new Map<string, { key: string; url: string }[]>();
+  for (const d of docs) {
+    if (!d.device_id || !d.file_path) continue;
+    const url = signedMap.get(d.file_path);
+    if (!url) continue;
+    const arr = photosByDevice.get(d.device_id) ?? [];
+    arr.push({ key: d.doc_key, url });
+    photosByDevice.set(d.device_id, arr);
+  }
+  const deviceViews: DeviceView[] = (devicesRes.data ?? []).map((d) => ({
+    id: d.id,
+    model_name: d.model_name,
+    quantity: d.quantity,
+    photos: photosByDevice.get(d.id) ?? [],
+  }));
+  const deviceActions = {
+    addDevice,
+    saveDevice,
+    deleteDevice,
+    createPhotoUrl: createDevicePhotoUrl,
+    recordPhoto: recordDevicePhoto,
+    deletePhoto: deleteDevicePhoto,
+  };
 
   const stage = customer.stage as StageKey;
   const next = nextStage(stage, customer.source);
@@ -346,17 +381,20 @@ ${docLines}
         <DocList docs={screening2} customerId={id} docMap={docMap} signedMap={signedMap} />
       </Card>
 
-      <Card title="3차 서류 (스크리닝 3)" desc="기기 사진 · 정보 수집">
-        <div className="mb-4">
-          <MultiPhotoUpload
-            id={id}
-            category="screening_3"
-            createUrl={createDocUploadUrl}
-            record={recordDocUpload}
-            variant="admin"
+      <Card title="3차 서류 (스크리닝 3)" desc="판매할 기기 · 정보 수집">
+        <div className="mb-5">
+          <p className="mb-2 text-sm font-medium text-navy-700">판매할 기기</p>
+          <DeviceManager id={id} devices={deviceViews} actions={deviceActions} />
+        </div>
+        <div className="border-t border-navy-100 pt-4">
+          <p className="mb-2 text-sm font-medium text-navy-700">기기정보 목록(엑셀)</p>
+          <DocList
+            docs={SCREENING_3_DOCS.filter((d) => d.key === "device_list_excel")}
+            customerId={id}
+            docMap={docMap}
+            signedMap={signedMap}
           />
         </div>
-        <DocList docs={SCREENING_3_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
       </Card>
 
       {/* 업로드 서류 모아보기 — 썸네일 · 라이트박스 · 선택 ZIP 다운로드 */}

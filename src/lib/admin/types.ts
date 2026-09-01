@@ -58,4 +58,15 @@ export type CustomerDocument = {
   checked: boolean;
   file_path: string | null;
   uploaded_at: string | null;
+  device_id: string | null;
+};
+
+export type CustomerDevice = {
+  id: string;
+  customer_id: string;
+  model_name: string | null;
+  quantity: number | null;
+  note: string | null;
+  sort_order: number;
+  created_at: string;
 };
