@@ -90,3 +90,34 @@ export async function recordDocUpload(
   revalidatePath(`/s/${token}`);
   return { ok: true };
 }
+
+// ── 서류 파일 삭제 (영업자) ──────────────────────
+export async function deleteDocByToken(
+  token: string,
+  doc_key: string,
+): Promise<{ ok: true } | { error: string }> {
+  const customer = await customerByToken(token);
+  if (!customer) return { error: "유효하지 않은 링크입니다." };
+
+  const db = createAdminClient();
+  const { data: row } = await db
+    .from("customer_documents")
+    .select("file_path")
+    .eq("customer_id", customer.id)
+    .eq("doc_key", doc_key)
+    .maybeSingle();
+
+  if (row?.file_path) {
+    await db.storage.from("customer-docs").remove([row.file_path]);
+  }
+
+  const { error } = await db
+    .from("customer_documents")
+    .delete()
+    .eq("customer_id", customer.id)
+    .eq("doc_key", doc_key);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/s/${token}`);
+  return { ok: true };
+}

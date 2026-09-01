@@ -11,7 +11,14 @@ import {
 } from "@/lib/admin/pipeline";
 import type { CustomerDocument } from "@/lib/admin/types";
 import { PublicDocUpload } from "@/components/PublicDocUpload";
-import { savePublicInfo } from "./actions";
+import { MultiPhotoUpload } from "@/components/MultiPhotoUpload";
+import { PublicPhotoList } from "@/components/PublicPhotoList";
+import {
+  createDocUploadUrl,
+  recordDocUpload,
+  deleteDocByToken,
+  savePublicInfo,
+} from "./actions";
 
 export const metadata: Metadata = {
   title: "스크리닝 정보 제출",
@@ -73,7 +80,18 @@ export default async function PublicSubmitPage({
     }
   }
 
+  // 여러 장 올린 기기 사진(device_photo_*) 목록
+  const photoItems = (docRows ?? [])
+    .filter((d) => d.doc_key.startsWith("device_photo_") && d.file_path)
+    .map((d, i) => ({
+      key: d.doc_key,
+      label: `기기 사진 ${i + 1}`,
+      url: d.file_path ? (signedMap.get(d.file_path) ?? "") : "",
+    }))
+    .filter((it) => it.url);
+
   const saveInfo = savePublicInfo.bind(null, token);
+  const deletePhoto = deleteDocByToken.bind(null, token);
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-xl px-4 py-8 sm:py-12">
@@ -152,9 +170,18 @@ export default async function PublicSubmitPage({
         <div>
           <h2 className="text-base font-semibold text-navy-900">기기 사진·정보</h2>
           <p className="mt-0.5 text-sm text-navy-500">
-            기기 사진 및 목록을 업로드해 주세요.
+            여러 기계를 한 번에 촬영해 올릴 수 있습니다.
           </p>
         </div>
+        <MultiPhotoUpload
+          id={token}
+          category="screening_3"
+          createUrl={createDocUploadUrl}
+          record={recordDocUpload}
+        />
+        {photoItems.length > 0 && (
+          <PublicPhotoList items={photoItems} deleteAction={deletePhoto} />
+        )}
         <DocUpload docs={SCREENING_3_DOCS} docMap={docMap} signedMap={signedMap} token={token} />
       </section>
 

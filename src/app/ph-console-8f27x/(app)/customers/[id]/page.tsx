@@ -7,6 +7,7 @@ import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
 import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { DocGallery, type GalleryItem } from "@/components/admin/DocGallery";
+import { MultiPhotoUpload } from "@/components/MultiPhotoUpload";
 import { adminPath } from "@/lib/admin/config";
 import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
@@ -28,8 +29,11 @@ import {
 } from "@/lib/admin/pipeline";
 import type { Customer, CustomerDocument } from "@/lib/admin/types";
 import {
+  createDocUploadUrl,
   deleteCustomer,
+  deleteDocument,
   moveStage,
+  recordDocUpload,
   setStage,
   toggleDocument,
   updateBasic,
@@ -132,20 +136,27 @@ export default async function CustomerDetailPage({
   }
 
   // 업로드된 서류 모아보기 (썸네일 갤러리 + ZIP 다운로드)
+  // 정의된 서류 + 동적으로 추가된 기기 사진(device_photo_*)을 모두 포함.
   const IMG_EXT = new Set(["jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "bmp"]);
-  const galleryItems: GalleryItem[] = [
-    ...SCREENING_2_DOCS,
-    ...SCREENING_3_DOCS,
-    ...CONTRACT_DOCS,
-    ...DELIVERY_DOCS,
-    ...MATURITY_DOCS,
-  ]
-    .map((d) => {
-      const row = docMap.get(d.key);
-      const url = row?.file_path ? signedMap.get(row.file_path) : undefined;
-      if (!row?.file_path || !url) return null;
+  const docLabelMap = new Map(
+    [
+      ...SCREENING_2_DOCS,
+      ...SCREENING_3_DOCS,
+      ...CONTRACT_DOCS,
+      ...DELIVERY_DOCS,
+      ...MATURITY_DOCS,
+    ].map((d) => [d.key, d.label]),
+  );
+  let photoNo = 0;
+  const galleryItems: GalleryItem[] = docs
+    .map((row) => {
+      const url = row.file_path ? signedMap.get(row.file_path) : undefined;
+      if (!row.file_path || !url) return null;
       const ext = (row.file_path.split(".").pop() ?? "").toLowerCase();
-      return { key: d.key, label: d.label, url, isImage: IMG_EXT.has(ext) };
+      const label = row.doc_key.startsWith("device_photo_")
+        ? `기기 사진 ${(photoNo += 1)}`
+        : (docLabelMap.get(row.doc_key) ?? row.doc_key);
+      return { key: row.doc_key, label, url, isImage: IMG_EXT.has(ext) };
     })
     .filter((x): x is GalleryItem => x !== null);
 
@@ -336,6 +347,15 @@ ${docLines}
       </Card>
 
       <Card title="3차 서류 (스크리닝 3)" desc="기기 사진 · 정보 수집">
+        <div className="mb-4">
+          <MultiPhotoUpload
+            id={id}
+            category="screening_3"
+            createUrl={createDocUploadUrl}
+            record={recordDocUpload}
+            variant="admin"
+          />
+        </div>
         <DocList docs={SCREENING_3_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
       </Card>
 
@@ -344,7 +364,7 @@ ${docLines}
         title="서류 모아보기"
         desc="업로드된 서류를 한눈에 확인하고, 선택해서 ZIP으로 내려받을 수 있습니다."
       >
-        <DocGallery customerId={id} items={galleryItems} />
+        <DocGallery customerId={id} items={galleryItems} deleteAction={deleteDocument} />
       </Card>
 
       {/* 거래 진정성 증빙 서류 — 진정한 매매+임대차 입증 (내부 관리) */}

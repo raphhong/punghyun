@@ -237,6 +237,32 @@ export async function recordDocUpload(
   return { ok: true };
 }
 
+// ── 서류 파일 삭제 ──────────────────────────────
+export async function deleteDocument(formData: FormData) {
+  const customer_id = String(formData.get("customer_id"));
+  const doc_key = String(formData.get("doc_key"));
+
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("customer_documents")
+    .select("file_path")
+    .eq("customer_id", customer_id)
+    .eq("doc_key", doc_key)
+    .maybeSingle();
+
+  if (row?.file_path) {
+    await supabase.storage.from("customer-docs").remove([row.file_path]);
+  }
+
+  const { error } = await supabase
+    .from("customer_documents")
+    .delete()
+    .eq("customer_id", customer_id)
+    .eq("doc_key", doc_key);
+  if (error) throw new Error(error.message);
+  refresh(customer_id);
+}
+
 // ── 고객 삭제 ───────────────────────────────────
 export async function deleteCustomer(formData: FormData) {
   const id = String(formData.get("id"));

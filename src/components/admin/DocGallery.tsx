@@ -13,9 +13,11 @@ export type GalleryItem = {
 export function DocGallery({
   customerId,
   items,
+  deleteAction,
 }: {
   customerId: string;
   items: GalleryItem[];
+  deleteAction?: (formData: FormData) => void | Promise<void>;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -151,13 +153,34 @@ export function DocGallery({
                 <span className="truncate text-xs text-navy-700" title={it.label}>
                   {it.label}
                 </span>
-                <a
-                  href={`${it.url}&download`}
-                  className="shrink-0 text-xs font-medium text-navy-400 hover:text-brand-600"
-                  title="개별 다운로드"
-                >
-                  ↓
-                </a>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <a
+                    href={`${it.url}&download`}
+                    className="text-xs font-medium text-navy-400 hover:text-brand-600"
+                    title="개별 다운로드"
+                  >
+                    ↓
+                  </a>
+                  {deleteAction && (
+                    <form
+                      action={deleteAction}
+                      onSubmit={(e) => {
+                        if (!confirm(`'${it.label}' 파일을 삭제할까요?`))
+                          e.preventDefault();
+                      }}
+                    >
+                      <input type="hidden" name="customer_id" value={customerId} />
+                      <input type="hidden" name="doc_key" value={it.key} />
+                      <button
+                        type="submit"
+                        className="text-xs font-medium text-navy-400 hover:text-red-600"
+                        title="삭제"
+                      >
+                        ×
+                      </button>
+                    </form>
+                  )}
+                </span>
               </div>
             </li>
           );

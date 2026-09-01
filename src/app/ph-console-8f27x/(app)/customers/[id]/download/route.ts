@@ -70,7 +70,9 @@ export async function GET(
 
     const buf = Buffer.from(await blob.arrayBuffer());
     const ext = path.includes(".") ? path.split(".").pop() : "bin";
-    const base = LABELS.get(d.doc_key) ?? d.doc_key;
+    const base = d.doc_key.startsWith("device_photo_")
+      ? "기기사진"
+      : (LABELS.get(d.doc_key) ?? d.doc_key);
     const key = `${base}.${ext}`;
     const n = used.get(key) ?? 0;
     used.set(key, n + 1);
