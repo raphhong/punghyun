@@ -6,6 +6,7 @@ import { site } from "@/lib/site";
 import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
 import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
+import { DocGallery, type GalleryItem } from "@/components/admin/DocGallery";
 import { adminPath } from "@/lib/admin/config";
 import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
@@ -129,6 +130,24 @@ export default async function CustomerDetailPage({
       if (s.signedUrl && s.path) signedMap.set(s.path, s.signedUrl);
     }
   }
+
+  // 업로드된 서류 모아보기 (썸네일 갤러리 + ZIP 다운로드)
+  const IMG_EXT = new Set(["jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "bmp"]);
+  const galleryItems: GalleryItem[] = [
+    ...SCREENING_2_DOCS,
+    ...SCREENING_3_DOCS,
+    ...CONTRACT_DOCS,
+    ...DELIVERY_DOCS,
+    ...MATURITY_DOCS,
+  ]
+    .map((d) => {
+      const row = docMap.get(d.key);
+      const url = row?.file_path ? signedMap.get(row.file_path) : undefined;
+      if (!row?.file_path || !url) return null;
+      const ext = (row.file_path.split(".").pop() ?? "").toLowerCase();
+      return { key: d.key, label: d.label, url, isImage: IMG_EXT.has(ext) };
+    })
+    .filter((x): x is GalleryItem => x !== null);
 
   const stage = customer.stage as StageKey;
   const next = nextStage(stage, customer.source);
@@ -318,6 +337,14 @@ ${docLines}
 
       <Card title="3차 서류 (스크리닝 3)" desc="기기 사진 · 정보 수집">
         <DocList docs={SCREENING_3_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
+      </Card>
+
+      {/* 업로드 서류 모아보기 — 썸네일 · 라이트박스 · 선택 ZIP 다운로드 */}
+      <Card
+        title="서류 모아보기"
+        desc="업로드된 서류를 한눈에 확인하고, 선택해서 ZIP으로 내려받을 수 있습니다."
+      >
+        <DocGallery customerId={id} items={galleryItems} />
       </Card>
 
       {/* 거래 진정성 증빙 서류 — 진정한 매매+임대차 입증 (내부 관리) */}
