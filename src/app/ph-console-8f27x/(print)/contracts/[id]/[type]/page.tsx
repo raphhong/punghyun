@@ -39,7 +39,10 @@ export default async function ContractPrintPage({
         }
       `}</style>
 
-      <EditableContract subtitle={`${v.meta.title} · ${customer.hospital_name ?? "(미입력)"}`}>
+      <EditableContract
+        subtitle={`${v.meta.title} · ${customer.hospital_name ?? "(미입력)"}`}
+        fileName={`${v.meta.title}_${customer.hospital_name ?? "고객"}`}
+      >
         <h1 className="mb-1 text-center text-2xl font-bold tracking-wide">{v.meta.title}</h1>
         <p className="mb-8 text-center text-xs text-neutral-500">
           {isDoc
