@@ -1,7 +1,8 @@
+import Image from "next/image";
 import { cn } from "@/lib/cn";
 
-// 풍현 로고 심볼 — 간결한 "P" 모노그램.
-// 곧게 뻗은 세로 기둥 + 부드러운 보울로 안정감과 신뢰를 담았습니다.
+// 풍현 로고 심볼 — 딥네이비 "P" 마크(원본 에셋).
+// 밝은 배경엔 네이비 P, 어두운 배경엔 화이트 P를 사용합니다.
 export function LogoMark({
   size = 32,
   tone = "light",
@@ -11,27 +12,16 @@ export function LogoMark({
   tone?: "light" | "dark";
   className?: string;
 }) {
-  const bg = tone === "dark" ? "#14284a" : "#0a1830";
+  const src = tone === "dark" ? "/logo-mark-white.png" : "/logo-mark.png";
   return (
-    <svg
+    <Image
+      src={src}
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      fill="none"
+      alt="풍현 로고"
       className={className}
-      role="img"
-      aria-label="풍현 로고"
-    >
-      <rect width="32" height="32" rx="9" fill={bg} />
-      <path
-        d="M11 25 V7 H17 a5.5 5.5 0 0 1 0 11 H11"
-        fill="none"
-        stroke="#57d7a3"
-        strokeWidth="3.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+      priority
+    />
   );
 }
 

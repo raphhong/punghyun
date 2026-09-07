@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { site } from "@/lib/site";
 
@@ -5,7 +7,11 @@ export const alt = `${site.name} — ${site.tagline}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function OgImage() {
+export default async function OgImage() {
+  // 로고(화이트 P) 를 co-located 에셋에서 로드해 data URI로 임베드 (빌드 시 정적 생성)
+  const logoBuf = await readFile(join(process.cwd(), "src", "app", "og-logo.png"));
+  const logoSrc = `data:image/png;base64,${Buffer.from(logoBuf).toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -17,36 +23,15 @@ export default function OgImage() {
           justifyContent: "center",
           padding: "90px",
           background:
-            "linear-gradient(135deg, #0a1830 0%, #0e1e3a 60%, #0a4432 140%)",
+            "linear-gradient(135deg, #0a1830 0%, #0e1e3a 60%, #16305f 140%)",
           color: "#ffffff",
           fontFamily: "sans-serif",
         }}
       >
         {/* 로고 */}
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 18,
-              background: "#0a1830",
-              border: "2px solid rgba(87,215,163,0.35)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <svg width="44" height="44" viewBox="0 0 32 32" fill="none">
-              <path
-                d="M12 24 V8 H16.5 A4.5 4.5 0 0 1 16.5 17 H12"
-                fill="none"
-                stroke="#57d7a3"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoSrc} width={80} height={80} alt="풍현 로고" />
           <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: "-0.02em" }}>
             {site.shortName}
           </div>
@@ -70,7 +55,7 @@ export default function OgImage() {
             fontWeight: 800,
             lineHeight: 1.15,
             letterSpacing: "-0.03em",
-            color: "#57d7a3",
+            color: "#7ea3dc",
           }}
         >
           자금은 지금.

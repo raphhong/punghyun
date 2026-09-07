@@ -19,16 +19,17 @@
   --color-navy-900: #0a1830;
   --color-navy-950: #061020;
 
-  --color-brand-50: #e9fbf3;
-  --color-brand-100: #c8f4e0;
-  --color-brand-200: #93e8c4;
-  --color-brand-300: #57d7a3;
-  --color-brand-400: #24bd84;
-  --color-brand-500: #12a06d;
-  --color-brand-600: #0a8159;
-  --color-brand-700: #0a6849;
-  --color-brand-800: #0b523b;
-  --color-brand-900: #0a4432;
+  /* 브랜드 포인트 = 로고 딥네이비(#03265a) 계열로 통일 */
+  --color-brand-50: #eef2f8;
+  --color-brand-100: #d4deee;
+  --color-brand-200: #a9bddc;
+  --color-brand-300: #7695c4;
+  --color-brand-400: #3f66a0;
+  --color-brand-500: #1b4680;
+  --color-brand-600: #0d3468;
+  --color-brand-700: #03265a;
+  --color-brand-800: #05204c;
+  --color-brand-900: #06193a;
 }
 
 :root {
@@ -51,6 +52,6 @@ body {
 /* 히어로 배경 그라디언트 */
 .bg-hero-grid {
   background-image:
-    radial-gradient(60% 60% at 50% 0%, rgba(18, 160, 109, 0.14) 0%, rgba(10, 24, 48, 0) 70%),
+    radial-gradient(60% 60% at 50% 0%, rgba(43, 92, 170, 0.22) 0%, rgba(10, 24, 48, 0) 70%),
     linear-gradient(180deg, #0a1830 0%, #0e1e3a 100%);
 }
