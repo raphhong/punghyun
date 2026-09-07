@@ -15,10 +15,17 @@ import type { Customer, CustomerDocument } from "@/lib/admin/types";
 import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
 import { SalesDocUpload } from "@/components/sales/SalesDocUpload";
+import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
 import {
   deleteSalesCustomer,
   salesDeleteDocument,
   updateSalesCustomer,
+  salesAddDevice,
+  salesSaveDevice,
+  salesDeleteDevice,
+  salesCreateDevicePhotoUrl,
+  salesRecordDevicePhoto,
+  salesDeleteDevicePhoto,
 } from "@/app/sales/actions";
 
 const inputCls =
@@ -34,9 +41,15 @@ export default async function SalesCustomerDetail({
   const supabase = await createClient();
 
   // RLS: 내 서브트리 고객만 조회 가능
-  const [customerRes, docsRes] = await Promise.all([
+  const [customerRes, docsRes, devicesRes] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).maybeSingle<Customer>(),
     supabase.from("customer_documents").select("*").eq("customer_id", id),
+    supabase
+      .from("customer_devices")
+      .select("id, model_name, quantity, sort_order, created_at")
+      .eq("customer_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
 
   const customer = customerRes.data;
@@ -58,6 +71,31 @@ export default async function SalesCustomerDetail({
       if (s.signedUrl && s.path) signedMap.set(s.path, s.signedUrl);
     }
   }
+
+  // 기기별 사진 그룹핑(device_id 기준) + 기기 목록
+  const photosByDevice = new Map<string, { key: string; url: string }[]>();
+  for (const d of docs) {
+    if (!d.device_id || !d.file_path) continue;
+    const url = signedMap.get(d.file_path);
+    if (!url) continue;
+    const arr = photosByDevice.get(d.device_id) ?? [];
+    arr.push({ key: d.doc_key, url });
+    photosByDevice.set(d.device_id, arr);
+  }
+  const deviceViews: DeviceView[] = (devicesRes.data ?? []).map((d) => ({
+    id: d.id,
+    model_name: d.model_name,
+    quantity: d.quantity,
+    photos: photosByDevice.get(d.id) ?? [],
+  }));
+  const deviceActions = {
+    addDevice: salesAddDevice,
+    saveDevice: salesSaveDevice,
+    deleteDevice: salesDeleteDevice,
+    createPhotoUrl: salesCreateDevicePhotoUrl,
+    recordPhoto: salesRecordDevicePhoto,
+    deletePhoto: salesDeleteDevicePhoto,
+  };
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
@@ -174,13 +212,24 @@ ${docLines}
           customerId={customer.id}
         />
       </Card>
-      <Card title="3차 스크리닝 서류">
-        <DocList
-          docs={SCREENING_3_DOCS}
-          docMap={docMap}
-          signedMap={signedMap}
-          customerId={customer.id}
-        />
+      <Card title="3차 스크리닝 서류" desc="판매할 기기 · 정보 수집">
+        <div className="mb-5">
+          <p className="mb-2 text-sm font-medium text-navy-700">판매할 기기</p>
+          <DeviceManager
+            id={customer.id}
+            devices={deviceViews}
+            actions={deviceActions}
+          />
+        </div>
+        <div className="border-t border-navy-100 pt-4">
+          <p className="mb-2 text-sm font-medium text-navy-700">기기정보 목록(엑셀)</p>
+          <DocList
+            docs={SCREENING_3_DOCS.filter((d) => d.key === "device_list_excel")}
+            docMap={docMap}
+            signedMap={signedMap}
+            customerId={customer.id}
+          />
+        </div>
       </Card>
 
       {/* 고객 삭제 (인입 단계에서만) */}
