@@ -8,6 +8,9 @@ import { ShareMessage } from "@/components/admin/ShareMessage";
 import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { DocGallery, type GalleryItem } from "@/components/admin/DocGallery";
 import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
+import { StageStepper } from "@/components/admin/StageStepper";
+import { AutosaveForm } from "@/components/admin/AutosaveForm";
+import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { adminPath } from "@/lib/admin/config";
 import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
@@ -19,7 +22,6 @@ import {
   MATURITY_RESULTS,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
-  STAGES,
   docsForType,
   nextStage,
   prevStage,
@@ -31,8 +33,7 @@ import type { Customer, CustomerDocument } from "@/lib/admin/types";
 import {
   deleteCustomer,
   deleteDocument,
-  moveStage,
-  setStage,
+  changeStage,
   toggleDocument,
   updateBasic,
   updatePipeline,
@@ -49,26 +50,6 @@ export const metadata = { title: "고객 상세" };
 const inputCls =
   "mt-1.5 w-full rounded-lg border border-navy-200 bg-white px-3 py-2.5 text-sm text-navy-900 placeholder:text-navy-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 const labelCls = "block text-sm font-medium text-navy-700";
-
-function Card({
-  title,
-  desc,
-  children,
-}: {
-  title: string;
-  desc?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-navy-100 bg-white p-6">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-navy-900">{title}</h2>
-        {desc && <p className="mt-0.5 text-sm text-navy-500">{desc}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function Check({
   name,
@@ -199,6 +180,21 @@ export default async function CustomerDetailPage({
   const next = nextStage(stage, customer.source);
   const prev = prevStage(stage);
 
+  // 단계 집중형: 현재 단계에 해당하는 카드만 기본 펼침
+  const openBasic = stage === "intake" || stage === "screening_1";
+  const openLink =
+    stage === "intake" ||
+    stage === "screening_1" ||
+    stage === "screening_2" ||
+    stage === "screening_3";
+  const openScr2 = stage === "screening_2";
+  const openScr3 = stage === "screening_3";
+  const openInspection = stage === "inspection";
+  const openContract = stage === "contract";
+  const openFunding = stage === "funding";
+  const openOperation = stage === "operation";
+  const openMaturity = stage === "maturity";
+
   const updateBasicAction = updateBasic.bind(null, id);
   const updatePipelineAction = updatePipeline.bind(null, id);
 
@@ -254,56 +250,22 @@ ${docLines}
           </p>
         </div>
 
-        {/* 단계 이동 */}
-        <div className="flex items-center gap-2">
-          {prev && (
-            <form action={moveStage}>
-              <input type="hidden" name="id" value={id} />
-              <input type="hidden" name="direction" value="prev" />
-              <input type="hidden" name="current" value={stage} />
-              <input type="hidden" name="source" value={customer.source} />
-              <button className="rounded-lg border border-navy-200 px-3 py-2 text-sm font-medium text-navy-600 hover:bg-navy-50">
-                ← {stageLabel(prev)}
-              </button>
-            </form>
-          )}
-          {next && (
-            <form action={moveStage}>
-              <input type="hidden" name="id" value={id} />
-              <input type="hidden" name="direction" value="next" />
-              <input type="hidden" name="current" value={stage} />
-              <input type="hidden" name="source" value={customer.source} />
-              <button className="rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-600">
-                {stageLabel(next)} →
-              </button>
-            </form>
-          )}
-        </div>
       </div>
 
-      {/* 단계 직접 이동 */}
-      <form
-        action={setStage}
-        className="flex flex-wrap items-center gap-2 rounded-xl border border-navy-100 bg-white px-4 py-3"
-      >
-        <input type="hidden" name="id" value={id} />
-        <span className="text-sm text-navy-500">단계 직접 변경</span>
-        <select name="stage" defaultValue={stage} className="rounded-lg border border-navy-200 px-3 py-1.5 text-sm">
-          {STAGES.map((s) => (
-            <option key={s.key} value={s.key}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-        <button className="rounded-lg border border-navy-200 px-3 py-1.5 text-sm font-medium text-navy-600 hover:bg-navy-50">
-          적용
-        </button>
-      </form>
+      {/* 단계 진행바 (이동 · 직접 점프 통합) */}
+      <StageStepper
+        id={id}
+        stage={stage}
+        prevKey={prev}
+        nextKey={next}
+        action={changeStage}
+      />
 
       {/* 영업자 제출 링크 */}
-      <Card
+      <CollapsibleCard
         title="영업자 제출 링크"
         desc="이 링크를 영업자에게 전달하면, 로그인 없이 기본정보·서류를 올릴 수 있습니다."
+        open={openLink}
       >
         <div className="space-y-4">
           <ShareLink url={shareUrl} />
@@ -314,11 +276,16 @@ ${docLines}
             <ShareMessage message={shareMessage} />
           </div>
         </div>
-      </Card>
+      </CollapsibleCard>
 
       {/* 기본 정보 */}
-      <form action={updateBasicAction} className="space-y-6">
-        <Card title="기본 정보" desc="인입 · 스크리닝 1차">
+      <CollapsibleCard
+        title="기본 정보"
+        desc="인입 · 스크리닝 1차"
+        open={openBasic}
+        badge={openBasic ? "현재 단계" : undefined}
+      >
+        <AutosaveForm action={updateBasicAction}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={labelCls}>상호(업체명)</label>
@@ -364,24 +331,25 @@ ${docLines}
               <input name="maturity_date" type="date" defaultValue={customer.maturity_date ?? ""} className={inputCls} />
             </div>
           </div>
-        </Card>
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            className="rounded-lg bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-brand-600"
-          >
-            기본 정보 저장
-          </button>
-        </div>
-      </form>
+        </AutosaveForm>
+      </CollapsibleCard>
 
       {/* 서류 체크리스트 (기본정보 다음) */}
-      <Card title="2차 서류 (스크리닝 2)" desc="필수 서류 수집">
+      <CollapsibleCard
+        title="2차 서류 (스크리닝 2)"
+        desc="필수 서류 수집"
+        open={openScr2}
+        badge={openScr2 ? "현재 단계" : undefined}
+      >
         <DocList docs={screening2} customerId={id} docMap={docMap} signedMap={signedMap} />
-      </Card>
+      </CollapsibleCard>
 
-      <Card title="3차 서류 (스크리닝 3)" desc="판매할 기기 · 정보 수집">
+      <CollapsibleCard
+        title="3차 서류 (스크리닝 3)"
+        desc="판매할 기기 · 정보 수집"
+        open={openScr3}
+        badge={openScr3 ? "현재 단계" : undefined}
+      >
         <div className="mb-5">
           <p className="mb-2 text-sm font-medium text-navy-700">판매할 기기</p>
           <DeviceManager id={id} devices={deviceViews} actions={deviceActions} />
@@ -395,15 +363,16 @@ ${docLines}
             signedMap={signedMap}
           />
         </div>
-      </Card>
+      </CollapsibleCard>
 
       {/* 업로드 서류 모아보기 — 썸네일 · 라이트박스 · 선택 ZIP 다운로드 */}
-      <Card
+      <CollapsibleCard
         title="서류 모아보기"
         desc="업로드된 서류를 한눈에 확인하고, 선택해서 ZIP으로 내려받을 수 있습니다."
+        open
       >
         <DocGallery customerId={id} items={galleryItems} deleteAction={deleteDocument} />
-      </Card>
+      </CollapsibleCard>
 
       {/* 거래 진정성 증빙 서류 — 진정한 매매+임대차 입증 (내부 관리) */}
       <div className="rounded-2xl border border-brand-200 bg-brand-50/40 p-4">
@@ -414,7 +383,11 @@ ${docLines}
           진정한 매매·임대차임을 입증하기 위한 내부 서류입니다. 생성·서명 후 보관본을 업로드하세요.
         </p>
         <div className="mt-3 space-y-4">
-          <Card title="① 계약 체결" desc="매매·임대차 분리 · 잔존가치 근거">
+          <CollapsibleCard
+            title="① 계약 체결"
+            desc="매매·임대차 분리 · 잔존가치 근거"
+            open={openContract}
+          >
             <div className="mb-3 rounded-lg border border-brand-200 bg-white p-3">
               <p className="mb-2 text-xs text-brand-700/80">
                 고객 정보로 초안을 생성합니다. 새 탭에서 인쇄/PDF 저장 후 서명본을 아래에 업로드하세요.
@@ -438,19 +411,32 @@ ${docLines}
               </div>
             </div>
             <DocList docs={CONTRACT_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
-          </Card>
-          <Card title="② 자산 인도 · 소유권 이전" desc="인도확인·검수·소유표시">
+          </CollapsibleCard>
+          <CollapsibleCard
+            title="② 자산 인도 · 소유권 이전"
+            desc="인도확인·검수·소유표시"
+            open={openFunding}
+          >
             <DocList docs={DELIVERY_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
-          </Card>
-          <Card title="③ 만기 · 정산/재렌탈" desc="선택권·반납·비소구 입증">
+          </CollapsibleCard>
+          <CollapsibleCard
+            title="③ 만기 · 정산/재렌탈"
+            desc="선택권·반납·비소구 입증"
+            open={openMaturity}
+          >
             <DocList docs={MATURITY_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
-          </Card>
+          </CollapsibleCard>
         </div>
       </div>
 
-      {/* 진행 단계 */}
-      <form action={updatePipelineAction} className="space-y-6">
-        <Card title="실사 및 구조설계" desc="실사 일정 · 집행/렌탈가 · 내부 심의">
+      {/* 진행 단계 — 값 변경 시 자동저장. 모든 input이 한 폼 안에 있어야 체크박스 유실 없음. */}
+      <AutosaveForm action={updatePipelineAction} className="space-y-6">
+        <CollapsibleCard
+          title="실사 및 구조설계"
+          desc="실사 일정 · 집행/렌탈가 · 내부 심의"
+          open={openInspection}
+          badge={openInspection ? "현재 단계" : undefined}
+        >
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={labelCls}>실사 일정</label>
@@ -469,39 +455,60 @@ ${docLines}
           <div className="mt-4">
             <Check name="internal_review_done" label="내부 심의 완료" defaultChecked={customer.internal_review_done} />
           </div>
-        </Card>
+        </CollapsibleCard>
 
-        <Card title="계약 · 자금집행">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-navy-700">계약</p>
-              <Check name="contract_sent" label="계약서 전송 완료" defaultChecked={customer.contract_sent} />
-              <Check name="contract_done" label="계약 완료" defaultChecked={customer.contract_done} />
+        <CollapsibleCard
+          title="계약"
+          desc="계약서 전송 · 계약 완료"
+          open={openContract}
+          badge={openContract ? "현재 단계" : undefined}
+        >
+          <div className="space-y-3">
+            <Check name="contract_sent" label="계약서 전송 완료" defaultChecked={customer.contract_sent} />
+            <Check name="contract_done" label="계약 완료" defaultChecked={customer.contract_done} />
+          </div>
+        </CollapsibleCard>
+
+        <CollapsibleCard
+          title="자금집행"
+          desc="집행 예정 · 완료"
+          open={openFunding}
+          badge={openFunding ? "현재 단계" : undefined}
+        >
+          <div className="space-y-3">
+            <div>
+              <label className={labelCls}>집행 예정 일자</label>
+              <input name="funding_scheduled_date" type="date" defaultValue={customer.funding_scheduled_date ?? ""} className={inputCls} />
             </div>
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-navy-700">자금집행</p>
-              <div>
-                <label className={labelCls}>집행 예정 일자</label>
-                <input name="funding_scheduled_date" type="date" defaultValue={customer.funding_scheduled_date ?? ""} className={inputCls} />
-              </div>
-              <Check name="funding_done" label="집행 완료" defaultChecked={customer.funding_done} />
-              <div>
-                <label className={labelCls}>집행 완료 일자</label>
-                <input name="funding_done_date" type="date" defaultValue={customer.funding_done_date ?? ""} className={inputCls} />
-              </div>
+            <Check name="funding_done" label="집행 완료" defaultChecked={customer.funding_done} />
+            <div>
+              <label className={labelCls}>집행 완료 일자</label>
+              <input name="funding_done_date" type="date" defaultValue={customer.funding_done_date ?? ""} className={inputCls} />
             </div>
           </div>
-        </Card>
+        </CollapsibleCard>
 
-        <Card title="운영관리 · 만기처리">
+        <CollapsibleCard
+          title="운영관리"
+          desc="회차별 납부 관리"
+          open={openOperation}
+          badge={openOperation ? "현재 단계" : undefined}
+        >
+          <div className="space-y-3">
+            <Check name="payment_1" label="1회차 납부" defaultChecked={customer.payment_1} />
+            <Check name="payment_2" label="2회차 납부" defaultChecked={customer.payment_2} />
+            <Check name="payment_3" label="3회차 납부" defaultChecked={customer.payment_3} />
+            <Check name="unpaid" label="미납" defaultChecked={customer.unpaid} />
+          </div>
+        </CollapsibleCard>
+
+        <CollapsibleCard
+          title="만기처리"
+          desc="인수 · 반납 · 재렌탈 · 정산"
+          open={openMaturity}
+          badge={openMaturity ? "현재 단계" : undefined}
+        >
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-navy-700">회차 납부</p>
-              <Check name="payment_1" label="1회차 납부" defaultChecked={customer.payment_1} />
-              <Check name="payment_2" label="2회차 납부" defaultChecked={customer.payment_2} />
-              <Check name="payment_3" label="3회차 납부" defaultChecked={customer.payment_3} />
-              <Check name="unpaid" label="미납" defaultChecked={customer.unpaid} />
-            </div>
             <div className="space-y-3">
               <p className="text-sm font-medium text-navy-700">만기 결과</p>
               <select name="maturity_result" defaultValue={customer.maturity_result ?? ""} className={inputCls}>
@@ -534,31 +541,22 @@ ${docLines}
               <Check name="non_recourse_confirmed" label="완전 비소구 확인 (차액 미청구 · 거래 종료)" defaultChecked={customer.non_recourse_confirmed} />
             </div>
           </div>
-        </Card>
+        </CollapsibleCard>
 
-        <Card title="내부메모">
+        <CollapsibleCard title="내부메모">
           <textarea name="internal_memo" rows={4} defaultValue={customer.internal_memo ?? ""} className={inputCls} />
-        </Card>
-
-        <div className="sticky bottom-4 flex justify-end">
-          <button
-            type="submit"
-            className="rounded-lg bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-brand-600"
-          >
-            진행 단계 저장
-          </button>
-        </div>
-      </form>
+        </CollapsibleCard>
+      </AutosaveForm>
 
       {/* 위험 구역 */}
-      <Card title="고객 삭제" desc="이 작업은 되돌릴 수 없습니다.">
+      <CollapsibleCard title="고객 삭제" desc="이 작업은 되돌릴 수 없습니다.">
         <form action={deleteCustomer}>
           <input type="hidden" name="id" value={id} />
           <button className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100">
             고객 삭제
           </button>
         </form>
-      </Card>
+      </CollapsibleCard>
     </div>
   );
 }

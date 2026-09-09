@@ -55,7 +55,10 @@ export async function createCustomer(formData: FormData) {
 }
 
 // ── 기본 정보 업데이트 ───────────────────────────
-export async function updateBasic(id: string, formData: FormData) {
+export async function updateBasic(
+  id: string,
+  formData: FormData,
+): Promise<{ ok: true } | { error: string }> {
   const supabase = await createClient();
 
   const patch = {
@@ -72,12 +75,16 @@ export async function updateBasic(id: string, formData: FormData) {
   };
 
   const { error } = await supabase.from("customers").update(patch).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   refresh(id);
+  return { ok: true };
 }
 
 // ── 진행 단계 필드 업데이트 (실사·계약·운영·만기·메모) ─
-export async function updatePipeline(id: string, formData: FormData) {
+export async function updatePipeline(
+  id: string,
+  formData: FormData,
+): Promise<{ ok: true } | { error: string }> {
   const supabase = await createClient();
 
   const patch = {
@@ -107,8 +114,24 @@ export async function updatePipeline(id: string, formData: FormData) {
   };
 
   const { error } = await supabase.from("customers").update(patch).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   refresh(id);
+  return { ok: true };
+}
+
+// ── 특정 단계로 직접 이동 (stepper 클라이언트 호출용) ─
+export async function changeStage(
+  id: string,
+  stage: StageKey,
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("customers")
+    .update({ stage })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  refresh(id);
+  return { ok: true };
 }
 
 // ── 단계 이동 ───────────────────────────────────
