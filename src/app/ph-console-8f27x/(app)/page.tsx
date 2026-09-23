@@ -2,7 +2,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { adminPath } from "@/lib/admin/config";
 import { STAGES, stageLabel, type StageKey } from "@/lib/admin/pipeline";
+import { daysBetween, dueLabel, nextDue, todayISO } from "@/lib/admin/payments";
+import { PaymentInbox, type PendingRow } from "@/components/admin/PaymentInbox";
+import { setPaidCount } from "./customers/actions";
 import type { Customer } from "@/lib/admin/types";
+
+// 인박스에 노출할 임박 범위(일). 연체는 항상 포함.
+const INBOX_WINDOW_DAYS = 14;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -14,6 +20,44 @@ export default async function DashboardPage() {
     counts[r.stage as string] = (counts[r.stage as string] ?? 0) + 1;
   });
   const total = rows?.length ?? 0;
+
+  // 렌탈료 입금 인박스 — 첫 입금일이 설정된 건의 다음 미납 회차 중 연체·임박만.
+  const { data: schedRows } = await supabase
+    .from("customers")
+    .select(
+      "id, hospital_name, first_payment_date, rental_months, paid_count, rental_price",
+    )
+    .not("first_payment_date", "is", null);
+
+  const today = todayISO();
+  const inbox: PendingRow[] = [];
+  for (const c of (schedRows as Partial<Customer>[] | null) ?? []) {
+    const due = nextDue(
+      {
+        first_payment_date: c.first_payment_date ?? null,
+        rental_months: c.rental_months ?? null,
+        paid_count: c.paid_count ?? 0,
+        rental_price: c.rental_price ?? null,
+      },
+      today,
+    );
+    if (!due) continue;
+    const diff = daysBetween(today, due.dueDate);
+    if (diff > INBOX_WINDOW_DAYS) continue; // 아직 먼 예정은 제외 (연체=음수는 포함)
+    inbox.push({
+      id: c.id as string,
+      hospitalName: c.hospital_name || "(상호 미입력)",
+      href: adminPath(`customers/${c.id}`),
+      no: due.no,
+      total: c.rental_months ?? due.no,
+      dueDate: due.dueDate,
+      amount: due.amount,
+      status: due.status,
+      label: dueLabel(due.dueDate, today),
+    });
+  }
+  // 연체(예정일 이른) 순으로 정렬
+  inbox.sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
 
   const { data: recent } = await supabase
     .from("customers")
@@ -37,6 +81,9 @@ export default async function DashboardPage() {
           + 고객 추가
         </Link>
       </div>
+
+      {/* 렌탈료 입금 인박스 — 오늘/연체/임박 회차 */}
+      <PaymentInbox items={inbox} action={setPaidCount} />
 
       {/* 단계별 카드 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
