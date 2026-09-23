@@ -15,6 +15,8 @@ type RateAction = (
   rate: number | null,
 ) => Promise<{ ok: true } | { error: string }>;
 
+export type RentalStatus = "fully_paid" | "overdue" | "in_progress" | "none";
+
 export type CommissionDeal = {
   customerId: string;
   hospitalName: string;
@@ -24,9 +26,15 @@ export type CommissionDeal = {
   appliedRate: number; // 실제 적용율(%)
   total: number;
   paid: number;
-  fullyPaid: boolean;
-  rentalMonths: number | null;
-  paidCount: number;
+  rentalStatus: RentalStatus; // 회수 판단용 신호(게이트 아님)
+  rentalDetail: string;
+};
+
+const rentalStyle: Record<RentalStatus, string> = {
+  fully_paid: "bg-brand-500/15 text-brand-700",
+  overdue: "bg-red-100 text-red-700",
+  in_progress: "bg-navy-100 text-navy-500",
+  none: "bg-amber-50 text-amber-700",
 };
 
 export function CommissionRow({
@@ -43,16 +51,19 @@ export function CommissionRow({
   const [amount, setAmount] = useState("");
 
   const remaining = Math.max(0, deal.total - deal.paid);
-  const payableNow = deal.fullyPaid ? remaining : 0;
 
-  function record() {
+  function parseAmount(): number | null {
     const n = Number(amount.replace(/[,\s]/g, ""));
     if (!Number.isFinite(n) || n <= 0) {
-      alert("지급 금액을 입력하세요.");
-      return;
+      alert("금액을 입력하세요.");
+      return null;
     }
+    return n;
+  }
+
+  function run(delta: number) {
     startTransition(async () => {
-      const res = await recordAction(deal.customerId, n, deal.total);
+      const res = await recordAction(deal.customerId, delta, deal.total);
       if ("error" in res) {
         alert(res.error);
         return;
@@ -62,16 +73,16 @@ export function CommissionRow({
     });
   }
 
+  function pay() {
+    const n = parseAmount();
+    if (n != null) run(n);
+  }
+  function recover() {
+    const n = parseAmount();
+    if (n != null) run(-n);
+  }
   function payAll() {
-    if (payableNow <= 0) return;
-    startTransition(async () => {
-      const res = await recordAction(deal.customerId, payableNow, deal.total);
-      if ("error" in res) {
-        alert(res.error);
-        return;
-      }
-      router.refresh();
-    });
+    if (remaining > 0) run(remaining);
   }
 
   function saveRate(raw: string) {
@@ -89,9 +100,18 @@ export function CommissionRow({
     });
   }
 
+  const payLabel =
+    remaining <= 0 ? "지급 완료" : deal.paid > 0 ? "일부 지급" : "미지급";
+  const payStyle =
+    remaining <= 0
+      ? "bg-brand-50 text-brand-700"
+      : deal.paid > 0
+        ? "bg-amber-50 text-amber-700"
+        : "bg-navy-100 text-navy-600";
+
   return (
     <div className="grid grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-12 sm:items-center">
-      {/* 상호 + 완납 상태 */}
+      {/* 상호 + 렌탈 상태(회수 신호) */}
       <div className="sm:col-span-3">
         <Link
           href={deal.href}
@@ -100,19 +120,12 @@ export function CommissionRow({
           {deal.hospitalName}
         </Link>
         <div className="mt-1">
-          {deal.fullyPaid ? (
-            <span className="rounded-full bg-brand-500/15 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
-              렌탈료 완납
-            </span>
-          ) : deal.rentalMonths ? (
-            <span className="rounded-full bg-navy-100 px-2 py-0.5 text-[11px] font-medium text-navy-500">
-              렌탈 진행중 {deal.paidCount}/{deal.rentalMonths}
-            </span>
-          ) : (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-              회차 미설정
-            </span>
-          )}
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${rentalStyle[deal.rentalStatus]}`}
+            title="렌탈 진행 상황 (회수 판단용)"
+          >
+            {deal.rentalDetail}
+          </span>
         </div>
       </div>
 
@@ -146,48 +159,57 @@ export function CommissionRow({
         </p>
       </div>
 
-      {/* 지급 기록 */}
+      {/* 지급 / 회수 */}
       <div className="sm:col-span-3">
         {deal.total <= 0 ? (
           <span className="inline-block rounded-full bg-navy-100 px-2.5 py-1 text-xs font-medium text-navy-500">
             수수료 미산정
           </span>
-        ) : remaining <= 0 ? (
-          <span className="inline-block rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
-            지급 완료
-          </span>
-        ) : !deal.fullyPaid ? (
-          <span className="inline-block rounded-full bg-navy-100 px-2.5 py-1 text-xs font-medium text-navy-500">
-            지급 대기 (완납 전)
-          </span>
         ) : (
-          <div className="flex items-center gap-1.5">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={amount}
-              disabled={pending}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="금액"
-              className="w-24 rounded-lg border border-navy-200 bg-white px-2 py-1.5 text-right text-sm text-navy-900 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
-            />
-            <button
-              type="button"
-              onClick={record}
-              disabled={pending}
-              className="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
-            >
-              기록
-            </button>
-            <button
-              type="button"
-              onClick={payAll}
-              disabled={pending}
-              title="잔여 전액 지급 처리"
-              className="rounded-lg border border-navy-200 px-2 py-1.5 text-xs font-medium text-navy-600 hover:bg-navy-50 disabled:opacity-60"
-            >
-              전액
-            </button>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${payStyle}`}>
+                {payLabel}
+              </span>
+              {remaining > 0 && (
+                <button
+                  type="button"
+                  onClick={payAll}
+                  disabled={pending}
+                  className="rounded-lg bg-brand-500 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                >
+                  전액 선지급
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={amount}
+                disabled={pending}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="금액"
+                className="w-24 rounded-lg border border-navy-200 bg-white px-2 py-1.5 text-right text-sm text-navy-900 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={pay}
+                disabled={pending}
+                className="rounded-lg border border-brand-300 px-2 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60"
+              >
+                지급
+              </button>
+              <button
+                type="button"
+                onClick={recover}
+                disabled={pending}
+                title="지급한 수수료를 회수(차감)"
+                className="rounded-lg border border-red-200 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+              >
+                회수
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { adminPath } from "@/lib/admin/config";
-import { isRentalFullyPaid } from "@/lib/admin/commission";
 
 function refresh(customerId?: string) {
   revalidatePath(adminPath("commissions"));
@@ -44,31 +43,24 @@ export async function setDealRate(
   return { ok: true };
 }
 
-// ── 수수료 지급 기록 (부분 지급 누적) ─
-// 총액을 넘겨받아 0~총액 범위로 클램프. amount>0 이면 가산, <0 이면 차감(정정).
+// ── 수수료 지급/회수 기록 ─
+// 선지급 모델: 계약 즉시 지급 가능. amount>0 = 지급(가산), amount<0 = 회수(차감).
+// 누적 지급액(commission_paid)을 0~총액 범위로 클램프.
 export async function recordCommissionPayment(
   customerId: string,
   amount: number,
   total: number,
 ): Promise<{ ok: true } | { error: string }> {
   if (!Number.isFinite(amount) || amount === 0)
-    return { error: "지급 금액을 입력하세요." };
+    return { error: "금액을 입력하세요." };
 
   const supabase = await createClient();
   const { data, error: readErr } = await supabase
     .from("customers")
-    .select("commission_paid, rental_months, paid_count")
+    .select("commission_paid")
     .eq("id", customerId)
-    .single<{
-      commission_paid: number | null;
-      rental_months: number | null;
-      paid_count: number | null;
-    }>();
+    .single<{ commission_paid: number | null }>();
   if (readErr || !data) return { error: readErr?.message ?? "건 조회 실패" };
-
-  // 지급(가산)은 렌탈료 완납 후에만 허용. 정정(차감)은 항상 허용.
-  if (amount > 0 && !isRentalFullyPaid(data))
-    return { error: "렌탈료 완납 후에만 수수료를 지급할 수 있습니다." };
 
   const cap = Math.max(0, Math.round(total));
   const cur = data.commission_paid ?? 0;
