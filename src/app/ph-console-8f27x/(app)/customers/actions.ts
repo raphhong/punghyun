@@ -100,10 +100,9 @@ export async function updatePipeline(
     funding_done: bool(formData, "funding_done"),
     funding_done_date: str(formData, "funding_done_date"),
 
-    payment_1: bool(formData, "payment_1"),
-    payment_2: bool(formData, "payment_2"),
-    payment_3: bool(formData, "payment_3"),
-    unpaid: bool(formData, "unpaid"),
+    // 회차별 렌탈료 입금 스케줄 (완납 판정 = paid_count >= rental_months)
+    first_payment_date: str(formData, "first_payment_date"),
+    rental_months: num(formData, "rental_months"),
 
     maturity_result: str(formData, "maturity_result"),
     acquisition_price: num(formData, "acquisition_price"),
@@ -114,6 +113,22 @@ export async function updatePipeline(
   };
 
   const { error } = await supabase.from("customers").update(patch).eq("id", id);
+  if (error) return { error: error.message };
+  refresh(id);
+  return { ok: true };
+}
+
+// ── 렌탈료 완납 회차 설정 (회차 목록 클릭 → 순차 완납/되돌리기) ─
+export async function setPaidCount(
+  id: string,
+  count: number,
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const c = Math.max(0, Math.floor(count));
+  const { error } = await supabase
+    .from("customers")
+    .update({ paid_count: c })
+    .eq("id", id);
   if (error) return { error: error.message };
   refresh(id);
   return { ok: true };

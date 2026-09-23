@@ -14,6 +14,8 @@ export type SalesAgent = {
   invite_token: string;
   created_at: string;
   approved_at: string | null;
+  // 영업 수수료 기본율(%) — 최상위(root) 영업자에 설정, 건별 override 없으면 이 값 사용
+  commission_rate: number | null;
 };
 
 // 현재 로그인 세션의 영업자 정보. 로그인 안 됐으면 user: null.

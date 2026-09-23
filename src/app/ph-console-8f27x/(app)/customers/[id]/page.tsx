@@ -11,6 +11,7 @@ import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
 import { StageStepper } from "@/components/admin/StageStepper";
 import { AutosaveForm } from "@/components/admin/AutosaveForm";
 import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
+import { PaymentScheduleEditor } from "@/components/admin/PaymentScheduleEditor";
 import { adminPath } from "@/lib/admin/config";
 import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
@@ -43,6 +44,7 @@ import {
   createDevicePhotoUrl,
   recordDevicePhoto,
   deleteDevicePhoto,
+  setPaidCount,
 } from "../actions";
 
 export const metadata = { title: "고객 상세" };
@@ -490,16 +492,24 @@ ${docLines}
 
         <CollapsibleCard
           title="운영관리"
-          desc="회차별 납부 관리"
+          desc="회차별 렌탈료 납부 관리"
           open={openOperation}
           badge={openOperation ? "현재 단계" : undefined}
         >
-          <div className="space-y-3">
-            <Check name="payment_1" label="1회차 납부" defaultChecked={customer.payment_1} />
-            <Check name="payment_2" label="2회차 납부" defaultChecked={customer.payment_2} />
-            <Check name="payment_3" label="3회차 납부" defaultChecked={customer.payment_3} />
-            <Check name="unpaid" label="미납" defaultChecked={customer.unpaid} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelCls}>첫 회차 입금일</label>
+              <input name="first_payment_date" type="date" defaultValue={customer.first_payment_date ?? ""} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>총 렌탈 회차 (개월)</label>
+              <input name="rental_months" inputMode="numeric" defaultValue={customer.rental_months ?? ""} className={inputCls} placeholder="예: 36" />
+            </div>
           </div>
+          <p className="mt-2 text-xs text-navy-400">
+            첫 입금일과 총 회차를 저장하면 매월 같은 날짜로 회차별 예정일이 생성됩니다.
+            수수료는 렌탈료 완납 후 지급 대상이 됩니다.
+          </p>
         </CollapsibleCard>
 
         <CollapsibleCard
@@ -547,6 +557,24 @@ ${docLines}
           <textarea name="internal_memo" rows={4} defaultValue={customer.internal_memo ?? ""} className={inputCls} />
         </CollapsibleCard>
       </AutosaveForm>
+
+      {/* 회차별 렌탈료 납부 현황 — 자동저장 폼 밖(별도 액션) */}
+      <CollapsibleCard
+        title="회차별 렌탈료 납부 현황"
+        desc="회차를 눌러 완납 처리. 완납 시 영업 수수료 지급 대상이 됩니다."
+        open={openOperation}
+      >
+        <PaymentScheduleEditor
+          id={id}
+          schedule={{
+            first_payment_date: customer.first_payment_date,
+            rental_months: customer.rental_months,
+            paid_count: customer.paid_count,
+            rental_price: customer.rental_price,
+          }}
+          action={setPaidCount}
+        />
+      </CollapsibleCard>
 
       {/* 위험 구역 */}
       <CollapsibleCard title="고객 삭제" desc="이 작업은 되돌릴 수 없습니다.">

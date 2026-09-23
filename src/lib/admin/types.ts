@@ -36,6 +36,16 @@ export type Customer = {
   funding_done: boolean;
   funding_done_date: string | null;
 
+  // 회차별 렌탈료 입금 스케줄 (첫 입금일 + 총 회차 → 매월 예정, paid_count까지 완납)
+  first_payment_date: string | null;
+  rental_months: number | null;
+  paid_count: number;
+
+  // 영업 수수료 — 건별 수수료율 override(%)와 누적 지급액(원)
+  commission_rate: number | null;
+  commission_paid: number;
+
+  // (구) 3회차 납부 플래그 — 신규 스케줄로 대체. DB 컬럼 보존, UI 미사용.
   payment_1: boolean;
   payment_2: boolean;
   payment_3: boolean;

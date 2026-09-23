@@ -96,6 +96,18 @@ export function Sidebar({
       >
         영업자 관리
       </Link>
+      <Link
+        href={adminPath("commissions")}
+        onClick={onNavigate}
+        className={cn(
+          "rounded-lg px-3 py-2 text-sm transition-colors",
+          pathname === adminPath("commissions")
+            ? "bg-navy-800 text-white"
+            : "text-navy-300 hover:bg-navy-800",
+        )}
+      >
+        수수료 정산
+      </Link>
     </nav>
   );
 }
