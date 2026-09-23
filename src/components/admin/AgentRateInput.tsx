@@ -25,6 +25,7 @@ export function AgentRateInput({
   function save(raw: string) {
     const trimmed = raw.trim();
     const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && !Number.isFinite(next)) return; // 잘못된 입력은 무시(초기화 방지)
     const cur = rate ?? null;
     if (next === cur) return;
     startTransition(async () => {

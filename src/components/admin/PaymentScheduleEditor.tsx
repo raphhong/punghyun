@@ -115,8 +115,11 @@ export function PaymentScheduleEditor({
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusStyle[r.status]}`}
               >
-                {statusLabel[r.status]}
-                {!r.paid && r.status !== "scheduled" ? ` · ${dueLabel(r.dueDate)}` : ""}
+                {r.paid
+                  ? statusLabel.paid
+                  : r.status === "scheduled"
+                    ? statusLabel.scheduled
+                    : dueLabel(r.dueDate)}
               </span>
             </button>
           </li>

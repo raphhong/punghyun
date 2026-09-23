@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { adminPath } from "@/lib/admin/config";
+import { isRentalFullyPaid } from "@/lib/admin/commission";
 
 function refresh(customerId?: string) {
   revalidatePath(adminPath("commissions"));
@@ -56,10 +57,18 @@ export async function recordCommissionPayment(
   const supabase = await createClient();
   const { data, error: readErr } = await supabase
     .from("customers")
-    .select("commission_paid")
+    .select("commission_paid, rental_months, paid_count")
     .eq("id", customerId)
-    .single<{ commission_paid: number | null }>();
+    .single<{
+      commission_paid: number | null;
+      rental_months: number | null;
+      paid_count: number | null;
+    }>();
   if (readErr || !data) return { error: readErr?.message ?? "건 조회 실패" };
+
+  // 지급(가산)은 렌탈료 완납 후에만 허용. 정정(차감)은 항상 허용.
+  if (amount > 0 && !isRentalFullyPaid(data))
+    return { error: "렌탈료 완납 후에만 수수료를 지급할 수 있습니다." };
 
   const cap = Math.max(0, Math.round(total));
   const cur = data.commission_paid ?? 0;

@@ -77,6 +77,7 @@ export function CommissionRow({
   function saveRate(raw: string) {
     const trimmed = raw.trim();
     const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && !Number.isFinite(next)) return; // 잘못된 입력은 무시
     if (next === (deal.overrideRate ?? null)) return;
     startTransition(async () => {
       const res = await rateAction(deal.customerId, next);
@@ -147,7 +148,11 @@ export function CommissionRow({
 
       {/* 지급 기록 */}
       <div className="sm:col-span-3">
-        {remaining <= 0 ? (
+        {deal.total <= 0 ? (
+          <span className="inline-block rounded-full bg-navy-100 px-2.5 py-1 text-xs font-medium text-navy-500">
+            수수료 미산정
+          </span>
+        ) : remaining <= 0 ? (
           <span className="inline-block rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
             지급 완료
           </span>
