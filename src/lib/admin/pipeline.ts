@@ -162,6 +162,16 @@ export const SCREENING_3_DOCS: DocItem[] = [
   },
 ];
 
+// 관리자 고객 상세에서 별도로 보관하는 선택 서류.
+// 고객·영업자 제출 목록(ALL_DOCS)에는 포함하지 않음.
+export const PURCHASE_INTENT_DOCS: DocItem[] = [
+  {
+    key: "purchase_intent",
+    label: "매입의향서",
+    category: "inspection",
+  },
+];
+
 // ── 거래 진정성 증빙 서류 (풍현이 생성·체결·보관) ──────────
 // 목적: "위장 대부(양도담보)"가 아니라 "진정한 매매 + 진정한 임대차"임을
 // 객관적 문서로 입증하기 위한 내부 서류. 고객에게 받는 심사서류와 별개.
