@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
+  PURCHASE_INTENT_DOCS,
   CONTRACT_DOCS,
   DELIVERY_DOCS,
   MATURITY_DOCS,
@@ -14,6 +15,7 @@ const LABELS = new Map(
   [
     ...SCREENING_2_DOCS,
     ...SCREENING_3_DOCS,
+    ...PURCHASE_INTENT_DOCS,
     ...CONTRACT_DOCS,
     ...DELIVERY_DOCS,
     ...MATURITY_DOCS,

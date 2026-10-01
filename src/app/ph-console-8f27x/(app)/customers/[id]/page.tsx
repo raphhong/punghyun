@@ -21,6 +21,7 @@ import {
   HOSPITAL_TYPES,
   MATURITY_DOCS,
   MATURITY_RESULTS,
+  PURCHASE_INTENT_DOCS,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
   docsForType,
@@ -135,6 +136,7 @@ export default async function CustomerDetailPage({
     [
       ...SCREENING_2_DOCS,
       ...SCREENING_3_DOCS,
+      ...PURCHASE_INTENT_DOCS,
       ...CONTRACT_DOCS,
       ...DELIVERY_DOCS,
       ...MATURITY_DOCS,
@@ -365,6 +367,14 @@ ${docLines}
             signedMap={signedMap}
           />
         </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        title="매입의향서"
+        desc="고객별 매입의향서를 업로드하고 확인할 수 있습니다. (선택)"
+        open
+      >
+        <DocList docs={PURCHASE_INTENT_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
       </CollapsibleCard>
 
       {/* 업로드 서류 모아보기 — 썸네일 · 라이트박스 · 선택 ZIP 다운로드 */}
