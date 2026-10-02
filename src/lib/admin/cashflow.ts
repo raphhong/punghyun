@@ -8,7 +8,7 @@ export type CashCustomer = Pick<Customer, "id" | "hospital_name" | "stage" | "fi
 };
 export type FundingProfile = { customer_id: string; funding_type: "own" | "securitized" | null; creditor_name: string | null };
 export type Movement = {
-  id: string; customer_id: string; kind: "creditor_payment" | "securitization_inflow";
+  id: string; customer_id: string; kind: "creditor_payment" | "securitization_inflow" | "funding_disbursement";
   basis: "planned" | "actual"; cash_date: string | null; amount: number | null;
 };
 export type Amount = { value: number; known: number; missing: number; na?: boolean };
@@ -93,15 +93,22 @@ export function projectCashflow(customers: CashCustomer[], profiles: FundingProf
       // An empty ledger is not a confirmation that no cash moved this month.
       if (!flows.rentalActual.known) { flows.rentalActual.missing++; row.issues.push("선택 월 실제 수납 기록 없음: 미수납 확정 아님"); }
     }
-    if (c.funding_scheduled_date) add("fundingPlan", c.funding_scheduled_date, c.execution_amount, "자금 집행 예정");
-    else { flows.fundingPlan = missing(); row.issues.push("집행 예정일 미입력"); }
-    if (c.funding_done) {
-      add("fundingActual", c.funding_done_date, c.execution_amount, "자금 실제 집행");
-      if (!validDate(c.funding_done_date) || !money(c.execution_amount) || c.funding_done_date > today) { row.cumulative = missing(); row.issues.push("누적 집행액: 실제일·금액 확인 필요"); }
-      else row.cumulative = { value: c.execution_amount, known: 1, missing: 0 };
-    } else if (c.funding_done_date || ["operation", "maturity", "closed"].includes(c.stage)) {
-      flows.fundingActual = missing(); row.cumulative = missing(); row.issues.push("집행 완료 여부와 날짜 확인 필요");
+    // Contract purchase price / legacy completed flags do not prove tranche cash.
+    // Use one authoritative source for initial and residual disbursements.
+    for (const basis of ["planned", "actual"] as const) {
+      const key = basis === "planned" ? "fundingPlan" : "fundingActual";
+      const entries = movements.filter(m => m.customer_id === c.id && m.kind === "funding_disbursement" && m.basis === basis);
+      if (!entries.length) flows[key] = missing();
+      for (const m of entries) add(key, m.cash_date, m.amount, basis === "planned" ? "개별 집행 예정" : "개별 실제 집행");
     }
+    const actualFunding = movements.filter(m => m.customer_id === c.id && m.kind === "funding_disbursement" && m.basis === "actual");
+    if (!actualFunding.length) row.cumulative = missing();
+    for (const m of actualFunding) {
+      if (!validDate(m.cash_date) || !money(m.amount) || m.cash_date > today) { row.cumulative.missing++; continue; }
+      row.cumulative.value += m.amount; row.cumulative.known++;
+    }
+    if (!actualFunding.length || row.cumulative.missing) row.issues.push("최초 집행·잔금의 실제일/이체금액 확인 필요: 기존 매입총액·완료표시는 실제 집행 합산에서 제외");
+    if (c.execution_amount != null) row.details.push({ label: "기존 집행 설정 금액 (참고·현금흐름 합산 제외)", date: validDate(c.funding_done_date) ? c.funding_done_date : null, amount: money(c.execution_amount) ? c.execution_amount : null });
     const own = row.fundingType === "own";
     for (const kind of ["creditor_payment", "securitization_inflow"] as const) for (const basis of ["planned", "actual"] as const) {
       const key: FlowKey = `${kind === "creditor_payment" ? "creditor" : "inflow"}${basis === "planned" ? "Plan" : "Actual"}`;
