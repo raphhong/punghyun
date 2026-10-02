@@ -61,7 +61,7 @@ export function AdminShell({
       </div>
 
       {/* 본문 영역 */}
-      <div className="flex min-h-dvh flex-col">
+      <div className="flex min-h-dvh min-w-0 flex-col">
         <header className="flex h-16 items-center justify-between border-b border-navy-200 bg-white px-4 sm:px-6">
           <button
             type="button"
