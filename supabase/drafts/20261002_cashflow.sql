@@ -11,7 +11,7 @@ create table public.cashflow_profiles (
 create table public.cashflow_movements (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references public.cashflow_profiles(customer_id) on delete restrict,
-  kind text not null check (kind in ('creditor_payment', 'securitization_inflow')),
+  kind text not null check (kind in ('creditor_payment', 'securitization_inflow', 'funding_disbursement')),
   basis text not null check (basis in ('planned', 'actual')),
   cash_date date, -- missing date stays missing, never now() or contract date
   amount bigint check (amount >= 0 and amount <= 9007199254740991),
@@ -29,5 +29,8 @@ create policy cashflow_profiles_admin_read on public.cashflow_profiles for selec
 create policy cashflow_movements_admin_read on public.cashflow_movements for select to authenticated using (public.is_admin(auth.uid()));
 -- Entries, reversals, reconciliation and write/audit workflow require business approval.
 -- Actual rental receipts retain ONE source: customers.receipt_ledger when separately approved.
--- Funding retains ONE source: customers funding fields (single disbursement only).
+-- Funding retains ONE source: dated, evidenced funding_disbursement entries.
+-- Initial payment and residual payment are separate entries. Contract totals and
+-- legacy funding_done flags never backfill actual movements. No maturity recovery
+-- is generated automatically.
 commit;

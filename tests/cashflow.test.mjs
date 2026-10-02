@@ -28,7 +28,7 @@ test('own funding not applicable; unknown funding missing', () => {
 });
 test('no double counting plan actual inflow and disbursement', () => {
   const c = customer({ funding_done_date: '2026-02-03', receipt_ledger: { legacyPaidCount: 0, entries: [{ id: 'a', no: 1, amount: 1000000, receivedDate: '2026-02-04' }] } });
-  const r = run(c, profile(), [movement(), movement({ id: 'm2', basis: 'actual', amount: 700000 }), movement({ id: 'm3', kind: 'securitization_inflow', basis: 'actual', amount: 8000000 })]);
+  const r = run(c, profile(), [movement({ id: 'f1', kind: 'funding_disbursement', basis: 'actual', cash_date: '2026-02-03', amount: 10000000 }), movement(), movement({ id: 'm2', basis: 'actual', amount: 700000 }), movement({ id: 'm3', kind: 'securitization_inflow', basis: 'actual', amount: 8000000 })]);
   assert.equal(r.actualNet.value, -1700000); assert.equal(r.cumulative.value, 10000000); assert.equal(r.totals.creditorPlan.value, 800000);
 });
 test('missing disbursement date blocks certainty', () => { const r = run(customer({ funding_done_date: null })); assert.ok(r.cumulative.missing); assert.ok(r.totals.fundingActual.missing); assert.equal(r.cumulative.known, 0); });
@@ -39,3 +39,6 @@ test('Korean boundary and malformed period', () => { assert.equal(koreaToday(new
 test('entered zero remains known zero', () => { const r = run(customer({ rental_price: 0 })); assert.equal(r.totals.rentalPlan.known, 1); assert.equal(amountText(r.totals.rentalPlan), '₩0'); });
 test('records in another month cannot imply zero payment conditions', () => { const r = run(customer(), profile(), [movement({ cash_date: '2026-01-31' })]); assert.ok(r.totals.creditorPlan.missing); });
 test('movements on early pipeline customers remain in scope', () => { const r = run(customer({ stage: 'intake', first_payment_date: null, funding_done: false, funding_scheduled_date: null }), profile(), [movement()]); assert.equal(r.rows.length, 1); });
+
+test('contract total and legacy done flag never prove actual initial or residual cash', () => { const r = run(customer({ execution_amount: 90000000, funding_done: true }), profile(), [movement({ kind: 'funding_disbursement', basis: 'actual', amount: 60000000, cash_date: '2026-02-01' }), movement({ id: 'residual', kind: 'funding_disbursement', basis: 'planned', amount: 30000000, cash_date: '2026-03-01' })]); assert.equal(r.cumulative.value, 60000000); assert.equal(r.totals.fundingActual.value, 60000000); });
+test('maturity does not create automatic principal receipts', () => { const r=run(customer({ stage:'maturity', execution_amount:90000000 }), profile()); assert.equal(r.totals.rentalActual.value,0); assert.equal(r.totals.inflowActual.value,0); assert.ok(r.totals.rentalActual.missing); });
