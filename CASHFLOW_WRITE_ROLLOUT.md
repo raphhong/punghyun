@@ -13,7 +13,7 @@
 
 The SQL in `supabase/drafts/20261002_cashflow_writes.sql` is a draft. Do not run the older table-creation draft against existing tables. Do not deploy as complete until the following live checks are verified:
 
-1. Verify the actual project and main commit. Inspect table columns/types, constraints, indexes, RLS and grants for customers, admins, cashflow_profiles and cashflow_movements. In particular check whether payment_schedule already exists, whether receipt_ledger exists, and whether earlier independent ledger work conflicts.
+1. Verify the actual project and main commit. Inspect table columns/types, constraints, indexes, RLS and grants for customers, admins, cashflow_profiles and cashflow_movements. In particular check whether payment_schedule already exists, whether receipt_ledger exists, whether the existing source UNIQUE constraint is named cashflow_movements_source_reference_key, and whether earlier independent ledger work conflicts.
 2. Record a private read-only fingerprint and count of every existing cashflow row before applying anything. Keep customer IDs and financial data outside GitHub. Verify the same historical records after migration and after each authorized event write.
 3. Check only whether NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY exist in the server deployment environment. Never display, copy, commit, rotate or generate key values. Missing credentials or new persistent access require the appropriate user approval/handoff.
 4. Review and authorize the additive migration: one optional JSONB customer column, one new audit table, validation/snapshot helpers and two tightly scoped service-role-only functions. It does not change existing rows, original table grants, RLS policies or user membership. Any incompatible live schema needs a new reviewed migration, not a blind retry.
@@ -25,6 +25,6 @@ The SQL in `supabase/drafts/20261002_cashflow_writes.sql` is a draft. Do not run
 
 `npm ci`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
 
-The transaction tests use the PGlite PostgreSQL engine with synthetic rows and real SQL, including rollback failures injected into movement/audit triggers, role ACLs, exact source preservation, idempotency and stale snapshots. This is not proof of production Supabase schema/permissions or multi-process production behavior. Hook-level UI interaction tests are separate from live browser QA. Report blocked or never-run stages explicitly.
+The transaction tests use the PGlite PostgreSQL engine with synthetic rows and real SQL, including rollback failures injected into movement/audit triggers, role ACLs, exact source preservation, idempotency and stale snapshots. PGlite uses one connection: concurrent Promise calls do not prove advisory-lock behavior across independent PostgreSQL sessions. A real multi-connection staging race remains required, in addition to production Supabase schema/permission checks. Hook-level UI interaction tests are separate from live browser QA. Report blocked or never-run stages explicitly.
 
 Global lint currently has pre-existing CommonJS import violations in the three `build_*leaflet/profile.js` scripts. Do not change those unrelated files simply to hide the baseline. Production credentials are not required for isolated finance tests.

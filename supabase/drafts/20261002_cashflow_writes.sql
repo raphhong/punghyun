@@ -71,12 +71,18 @@ declare
   existing public.cashflow_movements%rowtype; line jsonb; idx integer := 0; total numeric := 0;
   last_date text := ''; months integer; operation text; movement_id uuid;
   today date := (now() at time zone 'Asia/Seoul')::date;
+  violated_constraint text;
 begin
   -- A caller can only invoke this through the service-role server after session validation.
   -- Recheck membership inside the same transaction; lookup errors abort, never permit.
   if p_actor is null or not exists(select 1 from public.admins where user_id = p_actor) then raise exception 'CASHFLOW_FORBIDDEN'; end if;
   if p_customer is null or p_request is null or p_expected_version is null or p_expected_version !~ '^[a-f0-9]{32}$' or jsonb_typeof(p_change) is distinct from 'object' then raise exception 'CASHFLOW_INVALID'; end if;
-  -- Serialize all finance writes for a customer, including initially absent profile rows.
+  -- Stable lock order: global request, global normalized evidence, then customer.
+  -- Cross-customer retries/evidence cannot race past the audit/source UNIQUE keys.
+  perform pg_advisory_xact_lock(hashtextextended('cashflow-request:' || p_request::text, 0));
+  if p_change->>'operation' = 'movement' and jsonb_typeof(p_change->'source_reference') = 'string' then
+    perform pg_advisory_xact_lock(hashtextextended('cashflow-source:' || trim(p_change->>'source_reference'), 0));
+  end if;
   perform pg_advisory_xact_lock(hashtextextended(p_customer::text, 0));
   perform 1 from public.customers where id = p_customer for update;
   if not found then raise exception 'CASHFLOW_NOT_FOUND'; end if;
@@ -164,6 +170,13 @@ begin
   insert into public.cashflow_write_audit(request_id,customer_id,actor_id,change,reason,before_state,after_state,result)
     values(p_request,p_customer,p_actor,p_change,trim(p_change->>'reason'),before_state,after_state,result);
   return result;
+exception when unique_violation then
+  -- A direct maintenance writer may not use these locks. This known constraint
+  -- still means a definite rollback, never an uncertain network outcome.
+  get stacked diagnostics violated_constraint = constraint_name;
+  if violated_constraint = 'cashflow_movements_source_reference_key' then raise exception 'CASHFLOW_DUPLICATE'; end if;
+  if violated_constraint = 'cashflow_write_audit_pkey' then raise exception 'CASHFLOW_REQUEST_REUSED'; end if;
+  raise;
 end $$;
 
 revoke all on function public.cashflow_valid_date(text), public.cashflow_valid_integer(jsonb,numeric,numeric), public.cashflow_snapshot(uuid),

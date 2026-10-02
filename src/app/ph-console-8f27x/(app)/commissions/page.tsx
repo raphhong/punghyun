@@ -1,15 +1,15 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { adminPath } from "@/lib/admin/config";
 import { STAGES, type StageKey } from "@/lib/admin/pipeline";
 import {
-  dueLabel,
   fmtWon,
-  nextDue,
   todayISO,
+  type RentalReceiptMovement,
 } from "@/lib/admin/payments";
+import { commissionRentalStatus } from "@/lib/admin/commission-rental";
 import {
   dealCommission,
-  isRentalFullyPaid,
   rootAgentId,
   type AgentNode,
 } from "@/lib/admin/commission";
@@ -17,7 +17,6 @@ import { AgentRateInput } from "@/components/admin/AgentRateInput";
 import {
   CommissionRow,
   type CommissionDeal,
-  type RentalStatus,
 } from "@/components/admin/CommissionRow";
 import {
   recordCommissionPayment,
@@ -45,8 +44,10 @@ type DealRow = {
   paid_count: number | null;
   rental_price: number | null;
   payment_schedule?: unknown;
+  receipt_ledger?: unknown;
 };
 type AgentRow = AgentNode & { name: string };
+type ReceiptRow = RentalReceiptMovement & { customer_id: string };
 
 type Group = {
   rootId: string | null;
@@ -58,44 +59,61 @@ type Group = {
   remainingSum: number;
 };
 
-function rentalOf(
-  c: DealRow,
-  today: string,
-): { status: RentalStatus; detail: string } {
-  if (isRentalFullyPaid(c)) return { status: "fully_paid", detail: "렌탈 완납" };
-  if (c.rental_months) {
-    const due = nextDue(
-      {
-        first_payment_date: c.first_payment_date,
-        rental_months: c.rental_months,
-        paid_count: c.paid_count,
-        rental_price: c.rental_price,
-        payment_schedule: c.payment_schedule,
-      },
-      today,
-    );
-    if (due && due.status === "overdue")
-      return { status: "overdue", detail: `렌탈 ${dueLabel(due.dueDate, today)}` };
-    return { status: "in_progress", detail: `렌탈 ${c.paid_count ?? 0}/${c.rental_months}` };
-  }
-  return { status: "none", detail: "회차 미설정" };
-}
-
 export default async function CommissionsPage() {
   const supabase = await createClient();
+  let uid: string | undefined;
+  let authenticationFailed = false;
+  try {
+    const claims = await supabase.auth.getClaims();
+    authenticationFailed = Boolean(claims.error);
+    uid = claims.data?.claims?.sub;
+  } catch {
+    authenticationFailed = true;
+  }
+  if (authenticationFailed) return <p role="alert">수수료 정산을 조회할 관리자 권한을 확인할 수 없습니다.</p>;
+  if (!uid) redirect(adminPath("login"));
+  let isAdmin = false;
+  try {
+    const admin = await supabase.from("admins").select("user_id").eq("user_id", uid).maybeSingle();
+    // The layout's compatibility fallback is not proof of finance access.
+    isAdmin = !admin.error && Boolean(admin.data);
+  } catch {
+    isAdmin = false;
+  }
+  if (!isAdmin) return <p role="alert">수수료 정산을 조회할 관리자 권한을 확인할 수 없습니다.</p>;
 
-  const [custRes, agentRes] = await Promise.all([
-    supabase
-      .from("customers")
-      .select(
-        "*",
-      )
-      .in("stage", COMPLETED_STAGES),
-    supabase.from("sales_agents").select("id, name, parent_id, commission_rate"),
+  async function readAll<T>(table: "customers" | "sales_agents" | "cashflow_movements"): Promise<{ rows: T[]; failed: boolean }> {
+    const rows: T[] = [];
+    try {
+      for (let from = 0; ; from += 500) {
+        let query = supabase.from(table).select(table === "sales_agents" ? "id, name, parent_id, commission_rate" : "*");
+        if (table === "customers") query = query.in("stage", COMPLETED_STAGES);
+        if (table === "cashflow_movements") query = query.eq("kind", "rental_receipt").eq("basis", "actual");
+        const result = await query.order("id").range(from, from + 499);
+        // Discard partial results: a later failed page cannot prove non-payment.
+        if (result.error || !result.data) return { rows: [], failed: true };
+        rows.push(...result.data as T[]);
+        if (result.data.length < 500) return { rows, failed: false };
+      }
+    } catch {
+      return { rows: [], failed: true };
+    }
+  }
+  const [custRes, agentRes, receiptRes] = await Promise.all([
+    readAll<DealRow>("customers"),
+    readAll<AgentRow>("sales_agents"),
+    readAll<ReceiptRow>("cashflow_movements"),
   ]);
+  if (custRes.failed || agentRes.failed) return <p role="alert">수수료 정산 자료를 조회하지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
 
-  const deals = (custRes.data as DealRow[] | null) ?? [];
-  const agents = (agentRes.data as AgentRow[] | null) ?? [];
+  const deals = custRes.rows;
+  const agents = agentRes.rows;
+  const receiptsByCustomer = new Map<string, ReceiptRow[]>();
+  for (const receipt of receiptRes.rows) {
+    const receipts = receiptsByCustomer.get(receipt.customer_id) ?? [];
+    receipts.push(receipt);
+    receiptsByCustomer.set(receipt.customer_id, receipts);
+  }
   const today = todayISO();
 
   const byId = new Map<string, AgentNode>(
@@ -127,7 +145,7 @@ export default async function CommissionsPage() {
     const { rate, total } = dealCommission(d, rootRate);
     const paid = d.commission_paid ?? 0;
     const remaining = Math.max(0, total - paid);
-    const rental = rentalOf(d, today);
+    const rental = commissionRentalStatus({ ...d, rental_receipts: receiptsByCustomer.get(d.id) ?? [] }, today, !receiptRes.failed);
 
     g.deals.push({
       customerId: d.id,

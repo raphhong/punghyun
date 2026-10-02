@@ -1,4 +1,4 @@
-import { addMonths, resolvePaymentSchedule, validDate } from "./payments";
+import { addMonths, resolvePaymentSchedule, todayISO, validDate } from "./payments";
 import type { Customer } from "./types";
 export { validDate } from "./payments";
 
@@ -25,7 +25,7 @@ const empty = (): Amount => ({ value: 0, known: 0, missing: 0 });
 const missing = (): Amount => ({ value: 0, known: 0, missing: 1 });
 const money = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-export function koreaToday(now = new Date()): string { return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(now); }
+export function koreaToday(now = new Date()): string { return todayISO(now); }
 export function validMonth(v: unknown): v is string { return typeof v === "string" && /^(19|20|21)\d{2}-(0[1-9]|1[0-2])$/.test(v); }
 export function shiftMonth(month: string, offset: number) { return addMonths(month + "-01", offset).slice(0, 7); }
 export function amountText(a: Amount): string {

@@ -69,7 +69,7 @@ export async function saveCustomerCashflow(request: CashflowSaveRequest): Promis
     if (result.error) return failure(result.error);
     const saved = stateResult(result.data);
     if ("error" in saved) return saved;
-    for (const path of [adminPath(), adminPath("customers"), adminPath(`customers/${request.customerId}`), adminPath("cashflow")]) revalidatePath(path);
+    for (const path of [adminPath(), adminPath("customers"), adminPath(`customers/${request.customerId}`), adminPath("cashflow"), adminPath("commissions")]) revalidatePath(path);
     return saved;
   } catch { return failure(null); }
 }

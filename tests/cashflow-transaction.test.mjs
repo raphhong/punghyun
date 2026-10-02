@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test, before, after } from 'node:test';
 import fs from 'node:fs';
 const { PGlite } = await import(process.env.CASHFLOW_PGLITE_MODULE || '@electric-sql/pglite');
+// PGlite serializes statements on one connection. Promise.all exercises concurrent
+// callers, not independent PostgreSQL sessions. Verify cross-session locks in staging.
 let db;
 const actor='10000000-0000-4000-8000-000000000001', customer='20000000-0000-4000-8000-000000000001';
 const movement = (overrides={}) => ({operation:'movement',id:null,kind:'funding_disbursement',basis:'actual',cash_date:'2020-01-02',amount:1234,installment_no:null,source_reference:'fixture-bank-reference',note:'',reason:'증빙 확인',...overrides});
@@ -38,3 +40,18 @@ test('existing source reference stays exact, even if short or padded',async()=>{
 test('legacy allocation blocks schedule shrink before anything changes',async()=>{await db.query("update public.customers set receipt_ledger=$2::jsonb where id=$1",[customer,JSON.stringify({legacyPaidCount:0,entries:[{id:'legacy',no:3,amount:1,receivedDate:'2020-01-01'}]})]);const before=await snapshot();await assert.rejects(()=>save({operation:'schedule',first_payment_date:'2020-01-20',rental_months:1,rental_price:100,expected_total:100,payment_schedule:[{no:1,dueDate:'2020-01-20',amount:100}],reason:'일정 변경'}),/CASHFLOW_LEGACY_LEDGER/);assert.deepEqual(await snapshot(),before);await db.query('update public.customers set receipt_ledger=null where id=$1',[customer]);});
 test('own funding cannot conceal creditor transactions',async()=>{await save({operation:'profile',funding_type:'own',creditor_name:null,reason:'자금 확인'});await assert.rejects(()=>save(movement({kind:'creditor_payment',amount:99,source_reference:'fixture-creditor'})),/CASHFLOW_PROFILE_CONFLICT/);await save({operation:'profile',funding_type:'securitized',creditor_name:'가상 채권사',reason:'분류 확인'});await save(movement({kind:'creditor_payment',amount:99,source_reference:'fixture-creditor'}));await assert.rejects(()=>save({operation:'profile',funding_type:'own',creditor_name:null,reason:'분류 변경'}),/CASHFLOW_PROFILE_CONFLICT/);});
 test('audit failure rolls back schedule and profile updates too',async()=>{const before=await snapshot();await db.exec("create function public.fixture_fail_audit() returns trigger language plpgsql as $$begin raise exception 'fixture failure';end$$;create trigger fixture_fail before insert on public.cashflow_write_audit for each row execute function public.fixture_fail_audit();");await assert.rejects(()=>save({operation:'profile',funding_type:null,creditor_name:null,reason:'분류 변경'}),/fixture failure/);await assert.rejects(()=>save({operation:'schedule',first_payment_date:'2020-01-21',rental_months:3,rental_price:10,expected_total:30,payment_schedule:[{no:1,dueDate:'2020-01-21',amount:10},{no:2,dueDate:'2020-02-21',amount:10},{no:3,dueDate:'2020-03-21',amount:10}],reason:'일정 정정'}),/fixture failure/);assert.deepEqual(await snapshot(),before);await db.exec('drop trigger fixture_fail on public.cashflow_write_audit;drop function public.fixture_fail_audit();');});
+test('cross-customer same-reference submissions yield one event and conclusive duplicate',async()=>{
+ const other='50000000-0000-4000-8000-000000000002';await db.query('insert into public.customers(id) values($1)',[other]);
+ const otherVersion=(await db.query('select public.read_customer_cashflow($1,$2) as state',[actor,other])).rows[0].state.version;
+ const currentVersion=(await snapshot()).version;
+ const c=movement({source_reference:'fixture-cross-customer',amount:5432});
+ const responses=await Promise.allSettled([save(c,crypto.randomUUID(),currentVersion),db.query('select public.save_customer_cashflow($1,$2,$3,$4,$5::jsonb)',[actor,other,crypto.randomUUID(),otherVersion,JSON.stringify(c)])]);
+ assert.equal(responses.filter(r=>r.status==='fulfilled').length,1);assert.match(responses.find(r=>r.status==='rejected').reason.message,/CASHFLOW_DUPLICATE/);
+ assert.equal((await db.query("select count(*) n from public.cashflow_movements where source_reference='fixture-cross-customer'")).rows[0].n,1);
+});
+test('known unique violations are definitive rollback errors, not unknown outcomes',async()=>{
+ const before=await snapshot();
+ await db.exec("create function public.fixture_unique_error() returns trigger language plpgsql as $$begin raise unique_violation using constraint='cashflow_movements_source_reference_key';end$$;create trigger fixture_fail before insert on public.cashflow_movements for each row execute function public.fixture_unique_error();");
+ await assert.rejects(()=>save(movement({source_reference:'fixture-maintenance-race',amount:9876})),/CASHFLOW_DUPLICATE/);
+ assert.deepEqual(await snapshot(),before);await db.exec('drop trigger fixture_fail on public.cashflow_movements;drop function public.fixture_unique_error();');
+});

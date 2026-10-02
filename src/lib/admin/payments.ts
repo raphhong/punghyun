@@ -101,10 +101,9 @@ export function resolvePaymentSchedule(
   return { ok: true, installments };
 }
 
-// 로컬 기준 오늘 날짜(YYYY-MM-DD).
-export function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// 한국 영업일 기준. UTC 서버/해외 브라우저에서도 원장·납부 상태가 같은 날짜를 사용합니다.
+export function todayISO(now = new Date()): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(now);
 }
 
 // iso 날짜에 m개월 더하기 — 같은 '일'을 유지하되 월말은 해당 월 마지막 날로 보정.
