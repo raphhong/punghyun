@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { beginDocumentUpload, finishDocumentUpload, setDocumentRemoved, assertNoRetainedAttachments } from "@/lib/documents/server";
+import type { UploadMetadata, UploadResult, DocumentResult } from "@/lib/documents/types";
 import { adminPath } from "@/lib/admin/config";
 import { nextStage, prevStage, type StageKey } from "@/lib/admin/pipeline";
 import type { CustomerSource } from "@/lib/admin/types";
@@ -199,106 +202,48 @@ export async function toggleDocument(formData: FormData) {
   refresh(customer_id);
 }
 
-// ── 서류 파일 업로드 ────────────────────────────
-export async function uploadDocument(formData: FormData) {
-  const customer_id = String(formData.get("customer_id"));
-  const doc_key = String(formData.get("doc_key"));
-  const category = String(formData.get("category"));
-  const file = formData.get("file") as File | null;
-
-  if (!file || file.size === 0) return;
-
-  const supabase = await createClient();
-  const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-  const path = `${customer_id}/${doc_key}-${Date.now()}.${ext}`;
-
-  const { error: upErr } = await supabase.storage
-    .from("customer-docs")
-    .upload(path, file, { upsert: true });
-  if (upErr) throw new Error(upErr.message);
-
-  const { error } = await supabase.from("customer_documents").upsert(
-    {
-      customer_id,
-      doc_key,
-      category,
-      checked: true,
-      file_path: path,
-      uploaded_at: new Date().toISOString(),
-    },
-    { onConflict: "customer_id,doc_key" },
-  );
-  if (error) throw new Error(error.message);
-  refresh(customer_id);
+// Every Server Action is an independently callable endpoint. Layout guards do
+// not authorize signed URLs or service-role writes.
+async function adminDocumentClient(customerId: string) {
+  const session = await createClient();
+  const { data: claimsData, error: authError } = await session.auth.getClaims();
+  const uid = claimsData?.claims?.sub;
+  if (authError || typeof uid !== "string") throw new Error("관리자 로그인이 필요합니다.");
+  const { data: admin, error: adminError } = await session.from("admins").select("user_id").eq("user_id", uid).maybeSingle();
+  if (adminError || !admin) throw new Error("관리자 권한이 필요합니다.");
+  const { data: customer, error } = await session.from("customers").select("id").eq("id", customerId).maybeSingle();
+  if (error || !customer) throw new Error("권한이 없거나 존재하지 않는 고객입니다.");
+  return createAdminClient();
 }
 
-// ── 서명 업로드 URL 발급 (관리자 브라우저 직접 업로드) ─
-export async function createDocUploadUrl(
-  customer_id: string,
-  doc_key: string,
-  filename: string,
-): Promise<{ path: string; token: string } | { error: string }> {
-  const supabase = await createClient();
-  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
-  const path = `${customer_id}/${doc_key}-${Date.now()}.${ext}`;
-
-  const { data, error } = await supabase.storage
-    .from("customer-docs")
-    .createSignedUploadUrl(path);
-  if (error || !data) return { error: error?.message ?? "URL 발급 실패" };
-
-  return { path: data.path, token: data.token };
+export async function createDocUploadUrl(customerId: string, docKey: string, filename: string, metadata?: UploadMetadata): Promise<UploadResult> {
+  try {
+    return await beginDocumentUpload(await adminDocumentClient(customerId), customerId, docKey, filename, metadata, "admin");
+  } catch (e) { return { error: e instanceof Error ? e.message : "권한 오류" }; }
 }
 
-// ── 업로드 완료 후 DB 기록 (관리자) ──────────────
-export async function recordDocUpload(
-  customer_id: string,
-  doc_key: string,
-  category: string,
-  path: string,
-): Promise<{ ok: true } | { error: string }> {
-  const supabase = await createClient();
-  const { error } = await supabase.from("customer_documents").upsert(
-    {
-      customer_id,
-      doc_key,
-      category,
-      checked: true,
-      file_path: path,
-      uploaded_at: new Date().toISOString(),
-    },
-    { onConflict: "customer_id,doc_key" },
-  );
-  if (error) return { error: error.message };
-
-  refresh(customer_id);
-  return { ok: true };
+export async function recordDocUpload(customerId: string, docKey: string, category: string, path: string, attachmentId?: string): Promise<DocumentResult> {
+  try {
+    const result = await finishDocumentUpload(await adminDocumentClient(customerId), customerId, docKey, category, path, attachmentId, "admin");
+    if ("ok" in result) refresh(customerId);
+    return result;
+  } catch (e) { return { error: e instanceof Error ? e.message : "권한 오류" }; }
 }
 
-// ── 서류 파일 삭제 ──────────────────────────────
 export async function deleteDocument(formData: FormData) {
-  const customer_id = String(formData.get("customer_id"));
-  const doc_key = String(formData.get("doc_key"));
+  const customerId = String(formData.get("customer_id") ?? "");
+  const result = await setDocumentRemoved(await adminDocumentClient(customerId), customerId,
+    String(formData.get("doc_key") ?? ""), String(formData.get("attachment_id") ?? ""), true, "admin");
+  if ("error" in result) throw new Error(result.error);
+  refresh(customerId);
+}
 
-  const supabase = await createClient();
-  const { data: row } = await supabase
-    .from("customer_documents")
-    .select("file_path")
-    .eq("customer_id", customer_id)
-    .eq("doc_key", doc_key)
-    .maybeSingle();
-
-  if (row?.file_path) {
-    await supabase.storage.from("customer-docs").remove([row.file_path]);
-  }
-
-  const { error } = await supabase
-    .from("customer_documents")
-    .delete()
-    .eq("customer_id", customer_id)
-    .eq("doc_key", doc_key);
-  if (error) throw new Error(error.message);
-  refresh(customer_id);
+export async function restoreDocument(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "");
+  const result = await setDocumentRemoved(await adminDocumentClient(customerId), customerId,
+    String(formData.get("doc_key") ?? ""), String(formData.get("attachment_id") ?? ""), false, "admin");
+  if ("error" in result) throw new Error(result.error);
+  refresh(customerId);
 }
 
 // ── 기기 단위 등록 (여러 기계를 한 번에) ──────────
@@ -382,6 +327,9 @@ export async function recordDevicePhoto(
   path: string,
 ): Promise<{ ok: true } | { error: string }> {
   const supabase = await createClient();
+  if (!/^[0-9a-f-]{36}$/i.test(device_id) || !path.startsWith(`${customer_id}/device_photo_${device_id}_`) || path.split("/").length !== 2) {
+    return { error: "이 기기의 사진 업로드 경로가 아닙니다." };
+  }
   const doc_key = `device_photo_${device_id}_${Date.now()}_${Math.random()
     .toString(36)
     .slice(2, 7)}`;
@@ -403,14 +351,17 @@ export async function deleteDevicePhoto(
   customer_id: string,
   doc_key: string,
 ): Promise<{ ok: true } | { error: string }> {
+  if (!doc_key.startsWith("device_photo_")) return { error: "기기 사진만 삭제할 수 있습니다." };
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("customer_documents")
     .select("file_path")
     .eq("customer_id", customer_id)
     .eq("doc_key", doc_key)
+    .not("device_id", "is", null)
     .maybeSingle();
-  if (row?.file_path) {
+  if (!row) return { error: "기기 사진을 찾을 수 없습니다." };
+  if (row.file_path) {
     await supabase.storage.from("customer-docs").remove([row.file_path]);
   }
   const { error } = await supabase
@@ -426,7 +377,8 @@ export async function deleteDevicePhoto(
 // ── 고객 삭제 ───────────────────────────────────
 export async function deleteCustomer(formData: FormData) {
   const id = String(formData.get("id"));
-  const supabase = await createClient();
+  const supabase = await adminDocumentClient(id);
+  await assertNoRetainedAttachments(supabase, id);
   const { error } = await supabase.from("customers").delete().eq("id", id);
   if (error) throw new Error(error.message);
   refresh();

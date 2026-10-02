@@ -69,6 +69,14 @@ export type CustomerDocument = {
   file_path: string | null;
   uploaded_at: string | null;
   device_id: string | null;
+  attachment_id?: string;
+  original_name?: string | null;
+  size_bytes?: number | null;
+  content_type?: string | null;
+  source?: "admin" | "sales" | "public" | "legacy";
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
 };
 
 export type CustomerDevice = {
