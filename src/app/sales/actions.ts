@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { beginDocumentUpload, finishDocumentUpload, setDocumentRemoved, assertNoRetainedAttachments } from "@/lib/documents/server";
+import type { UploadMetadata, UploadResult, DocumentResult } from "@/lib/documents/types";
 import { getSessionAgent } from "@/lib/sales/agent";
 
 const str = (fd: FormData, k: string) => {
@@ -181,6 +183,7 @@ export async function deleteSalesCustomer(formData: FormData) {
   }
 
   const db = createAdminClient();
+  await assertNoRetainedAttachments(db, id);
   // 업로드된 서류 파일 정리 (best-effort)
   const { data: files } = await db.storage.from("customer-docs").list(id);
   if (files?.length) {
@@ -194,54 +197,21 @@ export async function deleteSalesCustomer(formData: FormData) {
   redirect("/sales");
 }
 
-// ── 서류 업로드 URL 발급 (영업자, service-role) ──
-export async function salesCreateDocUploadUrl(
-  customerId: string,
-  docKey: string,
-  filename: string,
-): Promise<{ path: string; token: string } | { error: string }> {
+// ── 파일별 업로드: 매 호출마다 승인 상태와 조직 고객 범위 재검증 ──
+export async function salesCreateDocUploadUrl(customerId: string, docKey: string, filename: string, metadata?: UploadMetadata): Promise<UploadResult> {
   try {
     await assertSubtreeCustomer(customerId);
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "권한 오류" };
-  }
-  const db = createAdminClient();
-  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
-  const path = `${customerId}/${docKey}-${Date.now()}.${ext}`;
-  const { data, error } = await db.storage
-    .from("customer-docs")
-    .createSignedUploadUrl(path);
-  if (error || !data) return { error: error?.message ?? "URL 발급 실패" };
-  return { path: data.path, token: data.token };
+    return await beginDocumentUpload(createAdminClient(), customerId, docKey, filename, metadata, "sales");
+  } catch (e) { return { error: e instanceof Error ? e.message : "권한 오류" }; }
 }
 
-// ── 업로드 완료 후 DB 기록 (영업자) ──
-export async function salesRecordDocUpload(
-  customerId: string,
-  docKey: string,
-  category: string,
-  path: string,
-): Promise<{ ok: true } | { error: string }> {
+export async function salesRecordDocUpload(customerId: string, docKey: string, category: string, path: string, attachmentId?: string): Promise<DocumentResult> {
   try {
     await assertSubtreeCustomer(customerId);
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "권한 오류" };
-  }
-  const db = createAdminClient();
-  const { error } = await db.from("customer_documents").upsert(
-    {
-      customer_id: customerId,
-      doc_key: docKey,
-      category,
-      checked: true,
-      file_path: path,
-      uploaded_at: new Date().toISOString(),
-    },
-    { onConflict: "customer_id,doc_key" },
-  );
-  if (error) return { error: error.message };
-  revalidatePath(`/sales/customers/${customerId}`);
-  return { ok: true };
+    const result = await finishDocumentUpload(createAdminClient(), customerId, docKey, category, path, attachmentId, "sales");
+    if ("ok" in result) revalidatePath(`/sales/customers/${customerId}`);
+    return result;
+  } catch (e) { return { error: e instanceof Error ? e.message : "권한 오류" }; }
 }
 
 // ── 기기 단위 등록 (영업자: 여러 기계를 한 번에) ──────────
@@ -348,6 +318,9 @@ export async function salesRecordDevicePhoto(
     return { error: e instanceof Error ? e.message : "권한 오류" };
   }
   const db = createAdminClient();
+  if (!/^[0-9a-f-]{36}$/i.test(device_id) || !path.startsWith(`${customer_id}/device_photo_${device_id}_`) || path.split("/").length !== 2) {
+    return { error: "이 기기의 사진 업로드 경로가 아닙니다." };
+  }
   const doc_key = `device_photo_${device_id}_${Date.now()}_${Math.random()
     .toString(36)
     .slice(2, 7)}`;
@@ -374,14 +347,17 @@ export async function salesDeleteDevicePhoto(
   } catch (e) {
     return { error: e instanceof Error ? e.message : "권한 오류" };
   }
+  if (!doc_key.startsWith("device_photo_")) return { error: "기기 사진만 삭제할 수 있습니다." };
   const db = createAdminClient();
   const { data: row } = await db
     .from("customer_documents")
     .select("file_path")
     .eq("customer_id", customer_id)
     .eq("doc_key", doc_key)
+    .not("device_id", "is", null)
     .maybeSingle();
-  if (row?.file_path) {
+  if (!row) return { error: "기기 사진을 찾을 수 없습니다." };
+  if (row.file_path) {
     await db.storage.from("customer-docs").remove([row.file_path]);
   }
   const { error } = await db
@@ -396,26 +372,19 @@ export async function salesDeleteDevicePhoto(
 
 // ── 서류 삭제 (영업자) ──
 export async function salesDeleteDocument(formData: FormData) {
-  const customerId = String(formData.get("customer_id"));
-  const docKey = String(formData.get("doc_key"));
+  const customerId = String(formData.get("customer_id") ?? "");
   await assertSubtreeCustomer(customerId);
+  const result = await setDocumentRemoved(createAdminClient(), customerId,
+    String(formData.get("doc_key") ?? ""), String(formData.get("attachment_id") ?? ""), true, "sales");
+  if ("error" in result) throw new Error(result.error);
+  revalidatePath(`/sales/customers/${customerId}`);
+}
 
-  const db = createAdminClient();
-  const { data: row } = await db
-    .from("customer_documents")
-    .select("file_path")
-    .eq("customer_id", customerId)
-    .eq("doc_key", docKey)
-    .maybeSingle();
-
-  if (row?.file_path) {
-    await db.storage.from("customer-docs").remove([row.file_path]);
-  }
-  await db
-    .from("customer_documents")
-    .delete()
-    .eq("customer_id", customerId)
-    .eq("doc_key", docKey);
-
+export async function salesRestoreDocument(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "");
+  await assertSubtreeCustomer(customerId);
+  const result = await setDocumentRemoved(createAdminClient(), customerId,
+    String(formData.get("doc_key") ?? ""), String(formData.get("attachment_id") ?? ""), false, "sales");
+  if ("error" in result) throw new Error(result.error);
   revalidatePath(`/sales/customers/${customerId}`);
 }

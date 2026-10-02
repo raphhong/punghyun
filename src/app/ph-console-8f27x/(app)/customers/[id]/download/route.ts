@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import JSZip from "jszip";
 import { createClient } from "@/lib/supabase/server";
+import { listCustomerDocuments } from "@/lib/documents/server";
 import {
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
@@ -34,51 +35,55 @@ export async function GET(
   const claims = claimsData?.claims;
   if (!claims) return new NextResponse("Unauthorized", { status: 401 });
   const uid = typeof claims.sub === "string" ? claims.sub : undefined;
-  if (uid) {
+  if (!uid) return new NextResponse("Unauthorized", { status: 401 });
+  {
     const { data: adminRow, error } = await supabase
       .from("admins")
       .select("user_id")
       .eq("user_id", uid)
       .maybeSingle();
-    if (!error && !adminRow) return new NextResponse("Forbidden", { status: 403 });
+    if (error || !adminRow) return new NextResponse("Forbidden", { status: 403 });
   }
 
-  const keys = (req.nextUrl.searchParams.get("keys") ?? "")
-    .split(",")
-    .map((k) => k.trim())
-    .filter(Boolean);
-  if (!keys.length) return new NextResponse("No documents selected", { status: 400 });
-
-  const [{ data: customer }, { data: docs }] = await Promise.all([
-    supabase.from("customers").select("hospital_name").eq("id", id).maybeSingle(),
-    supabase
-      .from("customer_documents")
-      .select("doc_key, file_path")
-      .eq("customer_id", id)
-      .in("doc_key", keys),
-  ]);
-
-  const files = (docs ?? []).filter((d) => !!d.file_path);
+  const selected = (name: string) => [...new Set((req.nextUrl.searchParams.get(name) ?? "").split(",").map((k) => k.trim()).filter(Boolean))];
+  const keys = selected("keys");
+  const ids = selected("ids");
+  if (!keys.length && !ids.length) return new NextResponse("No documents selected", { status: 400 });
+  if (keys.length + ids.length > 200) return new NextResponse("Too many documents selected", { status: 400 });
+  const { data: customer, error: customerError } = await supabase.from("customers").select("hospital_name").eq("id", id).maybeSingle();
+  if (customerError || !customer) return new NextResponse("Not found", { status: 404 });
+  let docs;
+  try { docs = await listCustomerDocuments(supabase, id); }
+  catch { return new NextResponse("Document list unavailable", { status: 503 }); }
+  const files = docs.filter((d) => d.file_path && !d.deleted_at && (ids.length ? ids.includes(d.attachment_id ?? d.id) : keys.includes(d.doc_key)));
   if (!files.length) return new NextResponse("Not found", { status: 404 });
+  // Never silently return an incomplete selection or drop a failed download.
+  if (ids.length && files.length !== ids.length) return new NextResponse("Selected files changed. Refresh the list and retry.", { status: 409 });
+  if (files.length > 200) return new NextResponse("Select at most 200 files per ZIP", { status: 413 });
 
   const zip = new JSZip();
-  const used = new Map<string, number>();
+  const used = new Set<string>();
+  let totalBytes = 0;
   for (const d of files) {
     const path = d.file_path as string;
     const { data: blob, error } = await supabase.storage
       .from("customer-docs")
       .download(path);
-    if (error || !blob) continue;
+    if (error || !blob) return new NextResponse("A selected file could not be downloaded. No partial ZIP was created.", { status: 502 });
+    totalBytes += blob.size;
+    if (totalBytes > 200 * 1024 * 1024) return new NextResponse("ZIP is limited to 200MB. Select fewer files.", { status: 413 });
 
     const buf = Buffer.from(await blob.arrayBuffer());
     const ext = path.includes(".") ? path.split(".").pop() : "bin";
     const base = d.doc_key.startsWith("device_photo_")
       ? "기기사진"
       : (LABELS.get(d.doc_key) ?? d.doc_key);
-    const key = `${base}.${ext}`;
-    const n = used.get(key) ?? 0;
-    used.set(key, n + 1);
-    const name = n > 0 ? `${base} (${n}).${ext}` : key;
+    const original = d.original_name?.replace(/[\\/\x00-\x1f]/g, "_");
+    const displayBase = original ? `${base}_${original.replace(/\.[^.]*$/, "")}` : base;
+    let name = `${displayBase}.${ext}`;
+    let suffix = 1;
+    while (used.has(name)) name = `${displayBase} (${suffix++}).${ext}`;
+    used.add(name);
     zip.file(name, buf);
   }
 

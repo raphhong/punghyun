@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LogoMark } from "@/components/Logo";
 import {
+  ALL_DOCS,
   HOSPITAL_TYPES,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
@@ -10,6 +11,8 @@ import {
   type DocItem,
 } from "@/lib/admin/pipeline";
 import type { CustomerDocument } from "@/lib/admin/types";
+import { listCustomerDocuments, validShareTokenExpiry } from "@/lib/documents/server";
+import { documentViews, groupDocuments } from "@/lib/documents/presentation";
 import { PublicDocUpload } from "@/components/PublicDocUpload";
 import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
 import {
@@ -39,6 +42,7 @@ type Row = {
   email: string | null;
   hospital_type: string | null;
   needed_funds: string | null;
+  share_token_expires_at?: string | null;
 };
 
 export default async function PublicSubmitPage({
@@ -51,18 +55,19 @@ export default async function PublicSubmitPage({
 
   const { data: customer } = await db
     .from("customers")
-    .select(
-      "id, hospital_name, representative, phone, email, hospital_type, needed_funds",
-    )
+    .select("*")
     .eq("share_token", token)
     .single<Row>();
 
   if (!customer) notFound();
 
-  const { data: docRows } = await db
-    .from("customer_documents")
-    .select("doc_key, checked, file_path, device_id")
-    .eq("customer_id", customer.id);
+  if (!validShareTokenExpiry(customer.share_token_expires_at)) notFound();
+
+  const allDocuments = await listCustomerDocuments(db, customer.id);
+  // Do not even sign admin-only files for a public bearer-token page.
+  const allowedKeys = new Set(ALL_DOCS.map((doc) => doc.key));
+  const visibleDocuments = allDocuments.filter((row) => allowedKeys.has(row.doc_key) || (row.device_id && row.doc_key.startsWith("device_photo_")));
+  const docRows = visibleDocuments.filter((row) => !row.deleted_at);
 
   const { data: deviceRows } = await db
     .from("customer_devices")
@@ -71,9 +76,7 @@ export default async function PublicSubmitPage({
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
-  const docMap = new Map(
-    (docRows ?? []).map((d) => [d.doc_key, d as Partial<CustomerDocument>]),
-  );
+  const docMap = groupDocuments(visibleDocuments);
 
   // 업로드된 파일 열람용 서명 URL (비공개 버킷 → 1시간 유효)
   const filePaths = (docRows ?? [])
@@ -184,7 +187,7 @@ export default async function PublicSubmitPage({
         <div>
           <h2 className="text-base font-semibold text-navy-900">필수 서류</h2>
           <p className="mt-0.5 text-sm text-navy-500">
-            각 항목의 파일을 선택하고 업로드를 눌러 주세요.
+            각 항목에 여러 파일을 선택하고 업로드를 눌러 주세요. 나중에 추가해도 기존 파일은 유지됩니다.
           </p>
         </div>
         <DocUpload docs={docsForType(SCREENING_2_DOCS, customer.hospital_type)} docMap={docMap} signedMap={signedMap} token={token} />
@@ -230,17 +233,14 @@ function DocUpload({
   token,
 }: {
   docs: DocItem[];
-  docMap: Map<string, Partial<CustomerDocument>>;
+  docMap: Map<string, CustomerDocument[]>;
   signedMap: Map<string, string>;
   token: string;
 }) {
   return (
     <ul className="space-y-3">
       {docs.map((doc) => {
-        const row = docMap.get(doc.key);
-        const fileUrl = row?.file_path
-          ? signedMap.get(row.file_path)
-          : undefined;
+        const rows = docMap.get(doc.key) ?? [];
         return (
           <PublicDocUpload
             key={doc.key}
@@ -249,8 +249,7 @@ function DocUpload({
             category={doc.category}
             label={doc.label}
             hint={doc.hint}
-            done={!!row?.file_path}
-            fileUrl={fileUrl}
+            files={documentViews(rows, signedMap)}
           />
         );
       })}

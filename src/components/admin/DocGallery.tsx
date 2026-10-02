@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { adminPath } from "@/lib/admin/config";
 
 export type GalleryItem = {
   key: string;
+  docKey: string;
+  attachmentId?: string;
+  filename: string;
   label: string;
   url: string;
   isImage: boolean;
@@ -19,11 +23,18 @@ export function DocGallery({
   items: GalleryItem[];
   deleteAction?: (formData: FormData) => void | Promise<void>;
 }) {
+  const router = useRouter();
+  const deleteLock = useRef(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [lightbox, setLightbox] = useState<number | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const imageItems = items.filter((it) => it.isImage);
-  const allSelected = items.length > 0 && selected.size === items.length;
+  const selectedItems = items.filter((item) => selected.has(item.key));
+  const allSelected = items.length > 0 && selectedItems.length === items.length;
+  const imageIndex = imageItems.findIndex((item) => item.key === lightbox);
+  const activeImage = imageItems[imageIndex];
 
   function toggle(key: string) {
     setSelected((prev) => {
@@ -39,30 +50,51 @@ export function DocGallery({
   }
 
   function downloadSelected() {
-    const keys = [...selected];
-    if (!keys.length) return;
-    const url = `${adminPath(`customers/${customerId}/download`)}?keys=${encodeURIComponent(
-      keys.join(","),
-    )}`;
-    window.location.href = url;
+    if (!selectedItems.length) return;
+    const params = new URLSearchParams();
+    const ids = selectedItems.filter((item) => !item.key.startsWith("legacy:")).map((item) => item.attachmentId ?? item.key);
+    const legacyKeys = selectedItems.filter((item) => item.key.startsWith("legacy:")).map((item) => item.docKey);
+    if (ids.length) params.set("ids", ids.join(","));
+    if (legacyKeys.length) params.set("keys", legacyKeys.join(","));
+    // This route returns a ZIP attachment, not a client-side page.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = `${adminPath(`customers/${customerId}/download`)}?${params}`;
   }
 
-  // 라이트박스: 이미지 목록 기준 인덱스
   function openLightbox(itemIndex: number) {
-    const it = items[itemIndex];
-    if (!it.isImage) {
-      window.open(it.url, "_blank", "noopener");
+    const item = items[itemIndex];
+    if (!item.isImage) {
+      window.open(item.url, "_blank", "noopener");
       return;
     }
-    const imgIdx = imageItems.findIndex((im) => im.key === it.key);
-    setLightbox(imgIdx);
+    setLightbox(item.key);
+  }
+
+  async function removeItem(item: GalleryItem) {
+    if (!deleteAction || !item.attachmentId || deleteLock.current) return;
+    if (!confirm(`다음 파일만 목록에서 제거할까요?\n${item.filename}\n파일 ID: ${item.attachmentId}\n해당 서류의 제거한 파일 목록에서 복원할 수 있습니다.`)) return;
+    deleteLock.current = true;
+    setDeleting(item.key);
+    setDeleteError("");
+    try {
+      const data = new FormData();
+      data.set("customer_id", customerId);
+      data.set("doc_key", item.docKey);
+      data.set("attachment_id", item.attachmentId);
+      await deleteAction(data);
+      setSelected((previous) => { const next = new Set(previous); next.delete(item.key); return next; });
+      router.refresh();
+    } catch (error) {
+      setDeleteError(`${item.filename}: ${error instanceof Error ? error.message : "제거하지 못했습니다."}`);
+    } finally {
+      deleteLock.current = false;
+      setDeleting(null);
+    }
   }
 
   const closeLightbox = () => setLightbox(null);
-  const prev = () =>
-    setLightbox((i) => (i === null ? i : (i - 1 + imageItems.length) % imageItems.length));
-  const next = () =>
-    setLightbox((i) => (i === null ? i : (i + 1) % imageItems.length));
+  const prev = () => { if (imageItems.length) setLightbox(imageItems[(imageIndex - 1 + imageItems.length) % imageItems.length].key); };
+  const next = () => { if (imageItems.length) setLightbox(imageItems[(imageIndex + 1) % imageItems.length].key); };
 
   useEffect(() => {
     if (lightbox === null) return;
@@ -74,7 +106,7 @@ export function DocGallery({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lightbox, imageItems.length]);
+  }, [lightbox, imageItems]);
 
   if (!items.length) {
     return (
@@ -97,16 +129,18 @@ export function DocGallery({
           />
           전체 선택
         </label>
-        <span className="text-xs text-navy-400">선택 {selected.size} / {items.length}</span>
+        <span className="text-xs text-navy-400">선택 {selectedItems.length} / {items.length}</span>
         <button
           type="button"
           onClick={downloadSelected}
-          disabled={selected.size === 0}
+          disabled={selectedItems.length === 0}
           className="ml-auto rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           선택 다운로드 (ZIP)
         </button>
       </div>
+
+      {deleteError && <p role="alert" className="mb-3 text-xs text-red-600">{deleteError}</p>}
 
       {/* 썸네일 그리드 */}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -150,8 +184,8 @@ export function DocGallery({
               </button>
 
               <div className="flex items-center justify-between gap-1 px-2 py-1.5">
-                <span className="truncate text-xs text-navy-700" title={it.label}>
-                  {it.label}
+                <span className="truncate text-xs text-navy-700" title={`${it.label} · ${it.filename}`}>
+                  {it.label} · {it.filename}
                 </span>
                 <span className="flex shrink-0 items-center gap-1.5">
                   <a
@@ -161,24 +195,15 @@ export function DocGallery({
                   >
                     ↓
                   </a>
-                  {deleteAction && (
-                    <form
-                      action={deleteAction}
-                      onSubmit={(e) => {
-                        if (!confirm(`'${it.label}' 파일을 삭제할까요?`))
-                          e.preventDefault();
-                      }}
-                    >
-                      <input type="hidden" name="customer_id" value={customerId} />
-                      <input type="hidden" name="doc_key" value={it.key} />
-                      <button
-                        type="submit"
-                        className="text-xs font-medium text-navy-400 hover:text-red-600"
-                        title="삭제"
-                      >
-                        ×
-                      </button>
-                    </form>
+                  {deleteAction && it.attachmentId && (
+                    <button
+                      type="button"
+                      disabled={deleting !== null}
+                      onClick={() => removeItem(it)}
+                      aria-label={`${it.filename} (${it.attachmentId}) 목록에서 제거`}
+                      className="text-xs font-medium text-navy-400 hover:text-red-600 disabled:opacity-40"
+                      title="목록에서 제거 (복원 가능)"
+                    >{deleting === it.key ? "…" : "×"}</button>
                   )}
                 </span>
               </div>
@@ -188,7 +213,7 @@ export function DocGallery({
       </ul>
 
       {/* 라이트박스 */}
-      {lightbox !== null && imageItems[lightbox] && (
+      {lightbox !== null && activeImage && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
           onClick={closeLightbox}
@@ -235,12 +260,12 @@ export function DocGallery({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={imageItems[lightbox].url}
-              alt={imageItems[lightbox].label}
+              src={activeImage.url}
+              alt={activeImage.label}
               className="max-h-[85vh] max-w-full rounded object-contain"
             />
             <figcaption className="mt-3 text-sm text-white/90">
-              {imageItems[lightbox].label} · {lightbox + 1} / {imageItems.length}
+              {activeImage.label} · {activeImage.filename} · {imageIndex + 1} / {imageItems.length}
             </figcaption>
           </figure>
         </div>

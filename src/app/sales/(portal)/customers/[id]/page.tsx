@@ -14,11 +14,15 @@ import {
 import type { Customer, CustomerDocument } from "@/lib/admin/types";
 import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
+import { AttachmentList } from "@/components/documents/AttachmentList";
+import { listCustomerDocuments } from "@/lib/documents/server";
+import { documentViews, groupDocuments } from "@/lib/documents/presentation";
 import { SalesDocUpload } from "@/components/sales/SalesDocUpload";
 import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
 import {
   deleteSalesCustomer,
   salesDeleteDocument,
+  salesRestoreDocument,
   updateSalesCustomer,
   salesAddDevice,
   salesSaveDevice,
@@ -43,7 +47,7 @@ export default async function SalesCustomerDetail({
   // RLS: 내 서브트리 고객만 조회 가능
   const [customerRes, docsRes, devicesRes] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).maybeSingle<Customer>(),
-    supabase.from("customer_documents").select("*").eq("customer_id", id),
+    listCustomerDocuments(supabase, id),
     supabase
       .from("customer_devices")
       .select("id, model_name, quantity, sort_order, created_at")
@@ -55,8 +59,11 @@ export default async function SalesCustomerDetail({
   const customer = customerRes.data;
   if (!customer) notFound();
 
-  const docs = (docsRes.data as CustomerDocument[] | null) ?? [];
-  const docMap = new Map(docs.map((d) => [d.doc_key, d]));
+  // Filter before signing: internal admin documents must never reach this portal.
+  const allowedKeys = new Set(ALL_DOCS.map((doc) => doc.key));
+  const visibleDocs = docsRes.filter((row) => allowedKeys.has(row.doc_key) || (row.device_id && row.doc_key.startsWith("device_photo_")));
+  const docs = visibleDocs.filter((row) => !row.deleted_at);
+  const docMap = groupDocuments(visibleDocs);
 
   // 서명 다운로드 URL
   const filePaths = docs
@@ -250,69 +257,27 @@ ${docLines}
   );
 }
 
-function DocList({
-  docs,
-  docMap,
-  signedMap,
-  customerId,
-}: {
+function DocList({ docs, docMap, signedMap, customerId }: {
   docs: DocItem[];
-  docMap: Map<string, CustomerDocument>;
+  docMap: Map<string, CustomerDocument[]>;
   signedMap: Map<string, string>;
   customerId: string;
 }) {
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-3">
       {docs.map((doc) => {
-        const row = docMap.get(doc.key);
-        const done = !!row?.file_path;
-        const url = row?.file_path ? signedMap.get(row.file_path) : undefined;
+        const rows = docMap.get(doc.key) ?? [];
+        const count = rows.filter((row) => row.file_path && !row.deleted_at).length;
         return (
-          <li
-            key={doc.key}
-            className="flex flex-wrap items-center gap-2 rounded-xl border border-navy-100 px-3 py-2.5"
-          >
-            <span
-              className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-                done ? "bg-brand-500 text-white" : "bg-navy-100 text-transparent"
-              }`}
-            >
-              ✓
-            </span>
-            <span className="text-sm text-navy-800">{doc.label}</span>
-            <div className="ml-auto flex items-center gap-2">
-              {url && (
-                <span className="inline-flex gap-2">
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-medium text-brand-600 hover:underline"
-                  >
-                    보기
-                  </a>
-                  <a
-                    href={`${url}&download`}
-                    className="text-xs font-medium text-navy-500 hover:underline"
-                  >
-                    다운로드
-                  </a>
-                  <form action={salesDeleteDocument}>
-                    <input type="hidden" name="customer_id" value={customerId} />
-                    <input type="hidden" name="doc_key" value={doc.key} />
-                    <button className="text-xs font-medium text-red-500 hover:underline">
-                      삭제
-                    </button>
-                  </form>
-                </span>
-              )}
-              <SalesDocUpload
-                customerId={customerId}
-                docKey={doc.key}
-                category={doc.category}
-                hasFile={done}
-              />
+          <li key={doc.key} className="space-y-3 rounded-xl border border-navy-100 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-navy-800">{doc.label}</span>
+              <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-500">첨부 {count}개</span>
             </div>
+            {doc.hint && <p className="text-xs text-navy-500">{doc.hint}</p>}
+            {doc.key === "tax_payment_cert" && <p className="text-xs text-amber-700">국세와 지방세 증명서를 모두 첨부해 주세요. 파일 수만으로 서류가 모두 갖춰졌는지 판단하지 않습니다.</p>}
+            <AttachmentList files={documentViews(rows, signedMap)} customerId={customerId} docKey={doc.key} deleteAction={salesDeleteDocument} restoreAction={salesRestoreDocument} />
+            <SalesDocUpload customerId={customerId} docKey={doc.key} category={doc.category} />
           </li>
         );
       })}

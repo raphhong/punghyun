@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { site } from "@/lib/site";
 import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
+import { AttachmentList } from "@/components/documents/AttachmentList";
+import { listCustomerDocuments } from "@/lib/documents/server";
+import { documentFilename, documentViews, groupDocuments } from "@/lib/documents/presentation";
 import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { DocGallery, type GalleryItem } from "@/components/admin/DocGallery";
 import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
@@ -35,6 +38,7 @@ import type { Customer, CustomerDocument } from "@/lib/admin/types";
 import {
   deleteCustomer,
   deleteDocument,
+  restoreDocument,
   changeStage,
   toggleDocument,
   updateBasic,
@@ -87,7 +91,7 @@ export default async function CustomerDetailPage({
   // 세 쿼리 모두 route param(id)에만 의존 → 병렬 실행으로 왕복 절감.
   const [customerRes, docsRes, devicesRes] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).single<Customer>(),
-    supabase.from("customer_documents").select("*").eq("customer_id", id),
+    listCustomerDocuments(supabase, id),
     supabase
       .from("customer_devices")
       .select("id, model_name, quantity, sort_order, created_at")
@@ -110,10 +114,8 @@ export default async function CustomerDetailPage({
     agentName = (ag as { name: string } | null)?.name ?? null;
   }
 
-  const docRows = docsRes.data;
-
-  const docs = (docRows ?? []) as CustomerDocument[];
-  const docMap = new Map(docs.map((d) => [d.doc_key, d]));
+  const docs = docsRes.filter((row) => !row.deleted_at);
+  const docMap = groupDocuments(docsRes);
 
   // 업로드된 파일들의 서명 URL 생성 (비공개 버킷 → 1시간 유효 링크)
   const filePaths = docs
@@ -142,16 +144,16 @@ export default async function CustomerDetailPage({
       ...MATURITY_DOCS,
     ].map((d) => [d.key, d.label]),
   );
-  let photoNo = 0;
+  const photoNumbers = new Map(docs.filter(row => row.doc_key.startsWith("device_photo_") && row.file_path && signedMap.has(row.file_path)).map((row, index) => [row.doc_key, index + 1]));
   const galleryItems: GalleryItem[] = docs
-    .map((row) => {
+    .map((row): GalleryItem | null => {
       const url = row.file_path ? signedMap.get(row.file_path) : undefined;
       if (!row.file_path || !url) return null;
       const ext = (row.file_path.split(".").pop() ?? "").toLowerCase();
       const label = row.doc_key.startsWith("device_photo_")
-        ? `기기 사진 ${(photoNo += 1)}`
+        ? `기기 사진 ${photoNumbers.get(row.doc_key)}`
         : (docLabelMap.get(row.doc_key) ?? row.doc_key);
-      return { key: row.doc_key, label, url, isImage: IMG_EXT.has(ext) };
+      return { key: row.attachment_id ?? row.id ?? `legacy:${row.doc_key}`, docKey: row.doc_key, attachmentId: row.attachment_id, filename: documentFilename(row), label, url, isImage: IMG_EXT.has(ext) };
     })
     .filter((x): x is GalleryItem => x !== null);
 
@@ -607,61 +609,38 @@ function DocList({
 }: {
   docs: DocItem[];
   customerId: string;
-  docMap: Map<string, CustomerDocument>;
+  docMap: Map<string, CustomerDocument[]>;
   signedMap: Map<string, string>;
 }) {
   return (
     <ul className="divide-y divide-navy-100">
       {docs.map((doc) => {
-        const row = docMap.get(doc.key);
-        const checked = row?.checked ?? false;
+        const rows = docMap.get(doc.key) ?? [];
+        // Manual checklist review is deliberately separate from file presence.
+        const checked = rows.some((row) => row.checked);
+        const count = rows.filter((row) => row.file_path && !row.deleted_at).length;
         return (
-          <li key={doc.key} className="flex flex-wrap items-center gap-3 py-3">
-            <form action={toggleDocument} className="flex items-center">
-              <input type="hidden" name="customer_id" value={customerId} />
-              <input type="hidden" name="doc_key" value={doc.key} />
-              <input type="hidden" name="category" value={doc.category} />
-              {/* 현재 상태의 반대로 토글: 체크돼있으면 checked 미전송 → false */}
-              {!checked && <input type="hidden" name="checked" value="1" />}
-              <button
-                className={`flex h-5 w-5 items-center justify-center rounded border ${
-                  checked
-                    ? "border-brand-500 bg-brand-500 text-white"
-                    : "border-navy-300 bg-white text-transparent"
-                }`}
-                aria-label="토글"
-              >
-                ✓
-              </button>
-            </form>
-
-            <span className={`flex-1 text-sm ${checked ? "text-navy-800" : "text-navy-500"}`}>
-              {doc.label}
-              {row?.file_path && signedMap.get(row.file_path) && (
-                <span className="ml-2 inline-flex gap-2 align-middle">
-                  <a
-                    href={signedMap.get(row.file_path)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-medium text-brand-600 hover:underline"
-                  >
-                    보기
-                  </a>
-                  <a
-                    href={`${signedMap.get(row.file_path)}&download`}
-                    className="text-xs font-medium text-navy-500 hover:underline"
-                  >
-                    다운로드
-                  </a>
-                </span>
-              )}
-            </span>
-
-            <AdminDocUpload
-              customerId={customerId}
-              docKey={doc.key}
-              category={doc.category}
-            />
+          <li key={doc.key} className="space-y-3 py-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-navy-800">{doc.label}</span>
+              <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-500">첨부 {count}개</span>
+              <form action={toggleDocument} className="ml-auto flex items-center gap-1.5">
+                <input type="hidden" name="customer_id" value={customerId} />
+                <input type="hidden" name="doc_key" value={doc.key} />
+                <input type="hidden" name="category" value={doc.category} />
+                {!checked && <input type="hidden" name="checked" value="1" />}
+                <button
+                  role="checkbox"
+                  aria-checked={checked}
+                  aria-label={`${doc.label} 필수 종류 확인`}
+                  className={`flex h-5 w-5 items-center justify-center rounded border ${checked ? "border-brand-500 bg-brand-500 text-white" : "border-navy-300 bg-white text-transparent"}`}
+                >✓</button>
+                <span className="text-xs text-navy-500">필수 종류 확인 (수동)</span>
+              </form>
+            </div>
+            {doc.key === "tax_payment_cert" ? <p className="text-xs text-amber-700">파일 있음은 제출 여부만 뜻합니다. 국세·지방세가 모두 있는지 직접 확인한 뒤 체크하세요. 기존 체크는 과거 업로드 시 자동 표시됐을 수 있습니다.</p> : <p className="text-xs text-navy-400">파일 첨부 여부와 담당자의 확인 상태는 별도로 관리됩니다.</p>}
+            <AttachmentList files={documentViews(rows, signedMap)} customerId={customerId} docKey={doc.key} deleteAction={deleteDocument} restoreAction={restoreDocument} />
+            <AdminDocUpload customerId={customerId} docKey={doc.key} category={doc.category} />
           </li>
         );
       })}
