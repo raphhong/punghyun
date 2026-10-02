@@ -34,6 +34,10 @@ export function Sidebar({
         대시보드
       </Link>
 
+      <Link href={adminPath("cashflow")} onClick={onNavigate} className={cn("rounded-lg px-3 py-2 text-sm font-semibold transition-colors", pathname === adminPath("cashflow") ? "bg-brand-500 text-white" : "text-navy-200 hover:bg-navy-800")}>
+        월별 현금흐름
+      </Link>
+
       <p className="mt-4 px-3 text-xs font-semibold uppercase tracking-wide text-navy-500">
         고객 관리
       </p>

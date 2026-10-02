@@ -83,6 +83,10 @@ export default async function DashboardPage() {
       </div>
 
       {/* 렌탈료 입금 인박스 — 오늘/연체/임박 회차 */}
+      <Link href={adminPath("cashflow")} className="block rounded-xl border border-brand-200 bg-white p-5 text-brand-600 hover:bg-brand-50">
+        <span className="font-semibold">월별 현금흐름 보기 →</span>
+        <span className="mt-1 block text-sm">누적 집행액 · 렌탈료 수납 · 채권사 지급 · 유동화 유입</span>
+      </Link>
       <PaymentInbox items={inbox} action={setPaidCount} />
 
       {/* 단계별 카드 */}
