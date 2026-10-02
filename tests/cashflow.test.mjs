@@ -42,3 +42,24 @@ test('movements on early pipeline customers remain in scope', () => { const r = 
 
 test('contract total and legacy done flag never prove actual initial or residual cash', () => { const r = run(customer({ execution_amount: 90000000, funding_done: true }), profile(), [movement({ kind: 'funding_disbursement', basis: 'actual', amount: 60000000, cash_date: '2026-02-01' }), movement({ id: 'residual', kind: 'funding_disbursement', basis: 'planned', amount: 30000000, cash_date: '2026-03-01' })]); assert.equal(r.cumulative.value, 60000000); assert.equal(r.totals.fundingActual.value, 60000000); });
 test('maturity does not create automatic principal receipts', () => { const r=run(customer({ stage:'maturity', execution_amount:90000000 }), profile()); assert.equal(r.totals.rentalActual.value,0); assert.equal(r.totals.inflowActual.value,0); assert.ok(r.totals.rentalActual.missing); });
+
+test('month-only evidenced cash is allocated once without inventing a day', () => {
+ const ms=[movement({kind:'funding_disbursement',basis:'actual',cash_date:null,cash_month:'2026-09',amount:1200000})];
+ const sept=run(customer(),profile(),ms,'2026-09');
+ assert.equal(sept.cumulative.value,1200000); assert.equal(sept.totals.fundingActual.value,1200000);
+ assert.equal(run(customer(),profile(),ms,'2026-10').totals.fundingActual.value,0);
+ assert.ok(!sept.rows[0].details.some(d=>d.date==='2026-09-01'));
+});
+test('future month-only actual cash is excluded', () => {
+ const r=run(customer(),profile(),[movement({kind:'funding_disbursement',basis:'actual',cash_date:null,cash_month:'2026-12',amount:1200000})],'2026-12');
+ assert.equal(r.cumulative.value,0); assert.equal(r.totals.fundingActual.value,0); assert.ok(r.cumulative.missing);
+});
+test('normalized receipt never derives additional cash from paid_count', () => {
+ const r=run(customer({paid_count:8}),profile(),[movement({kind:'rental_receipt',basis:'actual',installment_no:1,amount:1234})]);
+ assert.equal(r.totals.rentalActual.value,1234); assert.equal(r.totals.rentalActual.known,1);
+});
+test('legacy and normalized receipt representations are never added together', () => {
+ const c=customer({receipt_ledger:{legacyPaidCount:0,entries:[{id:'legacy',no:1,amount:1234,receivedDate:'2026-02-28'}]}});
+ const r=run(c,profile(),[movement({kind:'rental_receipt',basis:'actual',installment_no:1,amount:1234})]);
+ assert.equal(r.totals.rentalActual.value,1234); assert.equal(r.totals.rentalActual.known,1);
+});
