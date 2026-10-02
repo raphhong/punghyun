@@ -44,7 +44,7 @@ export default async function AppLayout({
   }
 
   return (
-    <AdminShell email={email} counts={counts}>
+    <AdminShell email={email} counts={counts} canViewCashflow={Boolean(!adminRes.error && adminRes.data)}>
       {children}
     </AdminShell>
   );

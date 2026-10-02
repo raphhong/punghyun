@@ -7,7 +7,7 @@ The dashboard is a read-only projection, not a reconciled bank balance or a data
 | Measure | Required source | If absent |
 | --- | --- | --- |
 | Rental schedule | customers.first_payment_date, rental_months, rental_price; optional payment_schedule overrides | Missing or partial |
-| Actual rental cash | customers.receipt_ledger entries with actual receivedDate and amount | Cannot infer from paid_count |
+| Actual rental cash | Existing customers.receipt_ledger, or rental_receipt movements when that ledger is absent | Cannot infer from paid_count; never add both representations |
 | Own vs securitized | cashflow_profiles.customer_id, funding_type | Unknown, never assumed own |
 | Creditor payments and securitization inflows | cashflow_movements with kind, basis, cash_date, amount and unique source_reference | Unconfirmed, not zero/completed |
 | Planned/actual disbursements | cashflow_movements.kind = funding_disbursement | Legacy purchase price and funding_done are reference only |
@@ -20,9 +20,13 @@ Initial payment and residual payment must be separate evidenced movements. Plann
 
 Prerequisites: public.customers, public.admins and the existing public.is_admin(uuid) function from migration_sales_agents.sql. New tables enable RLS, revoke anon/authenticated access, then grant authenticated SELECT guarded by the existing administrator predicate. No client INSERT/UPDATE/DELETE grants are added. No existing role membership or existing policy is broadened.
 
-If an earlier version of the draft was independently applied, do not rerun it blindly: inspect its constraints first, particularly whether funding_disbursement is an allowed kind. No draft was applied by this implementation.
+Do not rerun the draft blindly against an existing environment: inspect tables, constraints and policies first. Code deployment and database changes are separate operations requiring their own authorization.
 
 The optional receipt_ledger belongs to the separately maintained payment-repair workflow; it is not created by this cashflow draft. Its adoption requires existing installment/receipt history reconciliation, duplicate protection and an audited write workflow. A paid_count flag is neither a dated receipt nor grounds to recreate a receipt without matching the existing record.
+
+When that ledger is absent, admin-only rental_receipt movements may represent evidence-backed cash. Each source_reference must identify the evidence or link the existing receipt. This must not increment paid_count for a previously counted receipt. When both representations exist, the projection uses the legacy ledger and flags reconciliation rather than summing them.
+
+An actual movement requires evidence independent of the contract amount or workflow completion flag. If only the month is verified, cash_month preserves that precision and cash_date stays null. A wholly undated evidenced disbursement contributes to cumulative cash but is not assigned to a month. No automated backfill is included. The page and navigation also require a successful administrator lookup; new financial tables provide no client write API.
 
 ## Read-only diagnosis
 

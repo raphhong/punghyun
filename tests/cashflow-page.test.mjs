@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { loadSource, customer } from './cashflow-loader.mjs';
 function setup({ uid = 'admin', admin = true, adminError = false, customerError = false, extraError = false, errorCode, throwQuery = false, count = 1 } = {}) {
   const calls = [];
@@ -31,4 +33,13 @@ test('malformed repeated month gets visible fallback warning', async () => { con
 test('missing tables are distinguished from permission failures without raw error disclosure', async () => { for (const code of ['PGRST205','42501']) { const r=await setup({extraError:true,errorCode:code}).render(); assert.ok(r.props.warnings.some(w=>w.includes(code))); assert.ok(!JSON.stringify(r.props.warnings).includes('private error detail')); } });
 test('connection exceptions remain safe visible diagnostics', async () => { const r=await setup({throwQuery:true}).render(); assert.ok(r.props.warnings.some(w=>w.includes('연결'))); assert.ok(!JSON.stringify(r.props.warnings).includes('private connection detail')); });
 test('missing receipt column identified separately from cashflow extension', async () => { const r=await setup().render(); assert.ok(r.props.warnings.some(w=>w.includes('receipt_ledger'))); });
-test('chart period and actual basis propagate', async () => { const r=await setup().render({month:'2026-02',range:'3',basis:'actual'}); assert.equal(r.props.chartMonths.length,3); assert.equal(r.props.chartMonths[0].month,'2025-12'); assert.equal(r.props.basis,'actual'); });
+test('chart period and actual basis propagate', async () => { const r=await setup().render({month:'2026-11',range:'3',basis:'actual'}); assert.equal(r.props.chartMonths.length,3); assert.equal(r.props.chartMonths[0].month,'2026-09'); assert.equal(r.props.basis,'actual'); });
+test('requests before the start month are clamped on the server', async () => { const r=await setup().render({month:'2025-01',range:'12',basis:'actual'}); assert.equal(r.props.month,'2026-09'); assert.deepEqual(r.props.chartMonths.map(m=>m.month),['2026-09']); assert.ok(r.props.warnings.length); });
+
+test('cashflow navigation is hidden by default and requires explicit admin proof', () => {
+ const {Sidebar}=loadSource('src/components/admin/Sidebar.tsx',{'next/navigation':{usePathname:()=>'/ph-console-8f27x',useSearchParams:()=>new URLSearchParams()}});
+ for(const showCashflow of [undefined,false,true]) {
+  const html=renderToStaticMarkup(React.createElement(Sidebar,{counts:{},showCashflow}));
+  assert.equal(html.includes('/ph-console-8f27x/cashflow'),showCashflow===true);
+ }
+});

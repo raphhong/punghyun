@@ -10,10 +10,12 @@ export function AdminShell({
   email,
   counts,
   children,
+  canViewCashflow = false,
 }: {
   email?: string;
   counts: Record<string, number>;
   children: React.ReactNode;
+  canViewCashflow?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -26,7 +28,7 @@ export function AdminShell({
           <span className="font-bold text-white">풍현 관리자</span>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <Sidebar counts={counts} />
+          <Sidebar counts={counts} showCashflow={canViewCashflow} />
         </div>
       </aside>
 
@@ -55,7 +57,7 @@ export function AdminShell({
             <span className="font-bold text-white">풍현 관리자</span>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <Sidebar counts={counts} onNavigate={() => setOpen(false)} />
+            <Sidebar counts={counts} showCashflow={canViewCashflow} onNavigate={() => setOpen(false)} />
           </div>
         </aside>
       </div>

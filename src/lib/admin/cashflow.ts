@@ -8,8 +8,9 @@ export type CashCustomer = Pick<Customer, "id" | "hospital_name" | "stage" | "fi
 };
 export type FundingProfile = { customer_id: string; funding_type: "own" | "securitized" | null; creditor_name: string | null };
 export type Movement = {
-  id: string; customer_id: string; kind: "creditor_payment" | "securitization_inflow" | "funding_disbursement";
+  id: string; customer_id: string; kind: "creditor_payment" | "securitization_inflow" | "funding_disbursement" | "rental_receipt";
   basis: "planned" | "actual"; cash_date: string | null; amount: number | null;
+  cash_month?: string | null; installment_no?: number | null;
 };
 export type Amount = { value: number; known: number; missing: number; na?: boolean };
 export type FlowKey = "rentalPlan" | "rentalActual" | "creditorPlan" | "creditorActual" | "fundingPlan" | "fundingActual" | "inflowPlan" | "inflowActual";
@@ -49,7 +50,15 @@ export function projectCashflow(customers: CashCustomer[], profiles: FundingProf
     const profile = profiles.find(p => p.customer_id === c.id);
     const flows = Object.fromEntries(flowKeys.map(k => [k, empty()])) as Record<FlowKey, Amount>;
     const row: CashRow = { id: c.id, name: c.hospital_name || "상호 미입력", fundingType: profile?.funding_type ?? null, creditor: profile?.creditor_name ?? null, flows, cumulative: empty(), issues: [], details: [] };
-    const add = (key: FlowKey, date: unknown, amount: unknown, label: string) => {
+    const add = (key: FlowKey, date: unknown, amount: unknown, label: string, cashMonth?: string | null) => {
+      if (!validDate(date) && validMonth(cashMonth)) {
+        row.issues.push(`${label}: ${cashMonth} 월만 확인 · 정확한 일자 미확인`);
+        if (key.endsWith("Actual") && cashMonth > today.slice(0, 7)) { flows[key].missing++; return; }
+        if (cashMonth !== month) return;
+        if (money(amount)) { flows[key].value += amount; flows[key].known++; } else flows[key].missing++;
+        row.details.push({ label, date: `${cashMonth} (월만 확인)`, amount: money(amount) ? amount : null });
+        return;
+      }
       if (!validDate(date)) { flows[key].missing++; row.issues.push(`${label}: 날짜 미입력 또는 오류`); row.details.push({ label, date: null, amount: money(amount) ? amount : null }); return; }
       if (!date.startsWith(month)) return;
       // Actual future-dated entries cannot describe cash already moved.
@@ -73,9 +82,14 @@ export function projectCashflow(customers: CashCustomer[], profiles: FundingProf
     // Compatibility adapter for the independently maintained 2026-09-27 ledger.
     // Do not install, populate, or modify that ledger here.
     const ledger = c.receipt_ledger;
-    if (!object(ledger) || !Array.isArray(ledger.entries) || !Number.isInteger(ledger.legacyPaidCount) || Number(ledger.legacyPaidCount) < 0) {
+    const cashReceipts = movements.filter(m => m.customer_id === c.id && m.kind === "rental_receipt" && m.basis === "actual");
+    if (ledger == null && cashReceipts.length) {
+      for (const r of cashReceipts) add("rentalActual", r.cash_date, r.amount, `실제 수납 ${r.installment_no ?? "미지정"}회차`, r.cash_month);
+      if (!flows.rentalActual.known && !flows.rentalActual.missing) flows.rentalActual.missing++;
+    } else if (!object(ledger) || !Array.isArray(ledger.entries) || !Number.isInteger(ledger.legacyPaidCount) || Number(ledger.legacyPaidCount) < 0) {
       flows.rentalActual = missing(); row.issues.push("실제 수납원장 미입력: 완납 회차 수로 실제 수납을 추정하지 않음");
     } else {
+      if (cashReceipts.length) row.issues.push("기존 수납원장과 현금 원장이 함께 있음: 기존 수납원장만 집계하여 중복 방지 · 원천 대조 필요");
       if (Number(ledger.legacyPaidCount) > 0) { flows.rentalActual.missing++; row.issues.push("과거 완납분의 실제 수납일·금액 확인 필요"); }
       const ids = new Set<string>();
       for (const entry of ledger.entries) {
@@ -99,12 +113,13 @@ export function projectCashflow(customers: CashCustomer[], profiles: FundingProf
       const key = basis === "planned" ? "fundingPlan" : "fundingActual";
       const entries = movements.filter(m => m.customer_id === c.id && m.kind === "funding_disbursement" && m.basis === basis);
       if (!entries.length) flows[key] = missing();
-      for (const m of entries) add(key, m.cash_date, m.amount, basis === "planned" ? "개별 집행 예정" : "개별 실제 집행");
+      for (const m of entries) add(key, m.cash_date, m.amount, basis === "planned" ? "개별 집행 예정" : "개별 실제 집행", m.cash_month);
     }
     const actualFunding = movements.filter(m => m.customer_id === c.id && m.kind === "funding_disbursement" && m.basis === "actual");
     if (!actualFunding.length) row.cumulative = missing();
     for (const m of actualFunding) {
-      if (!validDate(m.cash_date) || !money(m.amount) || m.cash_date > today) { row.cumulative.missing++; continue; }
+      if (!money(m.amount) || (validDate(m.cash_date) && m.cash_date > today) || (validMonth(m.cash_month) && m.cash_month > today.slice(0, 7))) { row.cumulative.missing++; continue; }
+      if (!validDate(m.cash_date)) row.issues.push(validMonth(m.cash_month) ? "실제 집행 월만 확인: 누적·해당 월 합산, 정확한 일자 미확인" : "실제 지급 확인·날짜 미확인: 누적만 합산, 월별 배분 제외");
       row.cumulative.value += m.amount; row.cumulative.known++;
     }
     if (!actualFunding.length || row.cumulative.missing) row.issues.push("최초 집행·잔금의 실제일/이체금액 확인 필요: 기존 매입총액·완료표시는 실제 집행 합산에서 제외");
@@ -115,7 +130,7 @@ export function projectCashflow(customers: CashCustomer[], profiles: FundingProf
       const entries = movements.filter(m => m.customer_id === c.id && m.kind === kind && m.basis === basis);
       if (own) { flows[key].na = true; if (entries.length) { flows[key].missing++; row.issues.push("자체자금 건에 유동화 원장 존재: 불일치 확인 필요"); } continue; }
       if (!row.fundingType || !entries.length) { flows[key] = missing(); }
-      for (const m of entries) add(key, m.cash_date, m.amount, flowLabels[key]);
+      for (const m of entries) add(key, m.cash_date, m.amount, flowLabels[key], m.cash_month);
       // Other months' entries do not confirm a zero obligation or zero cash this month.
       if (!flows[key].known && !flows[key].missing) flows[key].missing++;
     }
