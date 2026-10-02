@@ -44,6 +44,7 @@ type DealRow = {
   rental_months: number | null;
   paid_count: number | null;
   rental_price: number | null;
+  payment_schedule?: unknown;
 };
 type AgentRow = AgentNode & { name: string };
 
@@ -69,6 +70,7 @@ function rentalOf(
         rental_months: c.rental_months,
         paid_count: c.paid_count,
         rental_price: c.rental_price,
+        payment_schedule: c.payment_schedule,
       },
       today,
     );
@@ -86,7 +88,7 @@ export default async function CommissionsPage() {
     supabase
       .from("customers")
       .select(
-        "id, hospital_name, stage, sales_agent_id, execution_amount, commission_rate, commission_paid, first_payment_date, rental_months, paid_count, rental_price",
+        "*",
       )
       .in("stage", COMPLETED_STAGES),
     supabase.from("sales_agents").select("id, name, parent_id, commission_rate"),

@@ -12,6 +12,8 @@ import { StageStepper } from "@/components/admin/StageStepper";
 import { AutosaveForm } from "@/components/admin/AutosaveForm";
 import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { PaymentScheduleEditor } from "@/components/admin/PaymentScheduleEditor";
+import { CashflowEditor } from "@/components/admin/CashflowEditor";
+import { loadCustomerCashflow, saveCustomerCashflow } from "../cashflow-actions";
 import { adminPath } from "@/lib/admin/config";
 import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
@@ -45,7 +47,6 @@ import {
   createDevicePhotoUrl,
   recordDevicePhoto,
   deleteDevicePhoto,
-  setPaidCount,
 } from "../actions";
 
 export const metadata = { title: "고객 상세" };
@@ -99,6 +100,9 @@ export default async function CustomerDetailPage({
   const customer = customerRes.data;
   if (!customer) notFound();
 
+  // Finance reads and edits fail closed unless the authenticated action can load the complete ledger.
+  const cashflowResult = await loadCustomerCashflow(id);
+
   // 담당 영업자 이름
   let agentName: string | null = null;
   if (customer.sales_agent_id) {
@@ -142,14 +146,14 @@ export default async function CustomerDetailPage({
       ...MATURITY_DOCS,
     ].map((d) => [d.key, d.label]),
   );
-  let photoNo = 0;
+  const photoNumbers = new Map(docs.filter(row => row.doc_key.startsWith("device_photo_") && row.file_path && signedMap.has(row.file_path)).map((row, index) => [row.doc_key, index + 1]));
   const galleryItems: GalleryItem[] = docs
     .map((row) => {
       const url = row.file_path ? signedMap.get(row.file_path) : undefined;
       if (!row.file_path || !url) return null;
       const ext = (row.file_path.split(".").pop() ?? "").toLowerCase();
       const label = row.doc_key.startsWith("device_photo_")
-        ? `기기 사진 ${(photoNo += 1)}`
+        ? `기기 사진 ${photoNumbers.get(row.doc_key)}`
         : (docLabelMap.get(row.doc_key) ?? row.doc_key);
       return { key: row.doc_key, label, url, isImage: IMG_EXT.has(ext) };
     })
@@ -445,7 +449,7 @@ ${docLines}
       <AutosaveForm action={updatePipelineAction} className="space-y-6">
         <CollapsibleCard
           title="실사 및 구조설계"
-          desc="실사 일정 · 집행/렌탈가 · 내부 심의"
+          desc="실사 일정 · 기존 집행금액 · 내부 심의"
           open={openInspection}
           badge={openInspection ? "현재 단계" : undefined}
         >
@@ -456,12 +460,13 @@ ${docLines}
             </div>
             <div className="hidden sm:block" />
             <div>
-              <label className={labelCls}>집행금액 (원)</label>
+              <label className={labelCls}>집행금액 상태 기록 (원, 현금 원장에 반영 안 됨)</label>
               <input name="execution_amount" inputMode="numeric" defaultValue={customer.execution_amount ?? ""} className={inputCls} placeholder="예: 300000000" />
             </div>
             <div>
-              <label className={labelCls}>렌탈가 (원)</label>
-              <input name="rental_price" inputMode="numeric" defaultValue={customer.rental_price ?? ""} className={inputCls} placeholder="예: 5000000" />
+              <p className={labelCls}>월 기준 렌탈료 (조회 전용)</p>
+              <p className="mt-2 text-sm text-navy-900">{customer.rental_price == null ? "미입력" : `${customer.rental_price.toLocaleString("ko-KR")}원`}</p>
+              <a href="#cashflow-editor" className="text-xs text-brand-600 hover:underline">현금흐름 편집에서 변경</a>
             </div>
           </div>
           <div className="mt-4">
@@ -483,18 +488,18 @@ ${docLines}
 
         <CollapsibleCard
           title="자금집행"
-          desc="집행 예정 · 완료"
+          desc="업무 상태만 기록 · 실제·예정 거래는 아래 현금흐름 편집에서 별도 등록"
           open={openFunding}
           badge={openFunding ? "현재 단계" : undefined}
         >
           <div className="space-y-3">
             <div>
-              <label className={labelCls}>집행 예정 일자</label>
+              <label className={labelCls}>집행 예정 일자 (상태 기록)</label>
               <input name="funding_scheduled_date" type="date" defaultValue={customer.funding_scheduled_date ?? ""} className={inputCls} />
             </div>
-            <Check name="funding_done" label="집행 완료" defaultChecked={customer.funding_done} />
+            <Check name="funding_done" label="집행 완료 상태 (실제 거래 원장은 별도 등록)" defaultChecked={customer.funding_done} />
             <div>
-              <label className={labelCls}>집행 완료 일자</label>
+              <label className={labelCls}>집행 완료 일자 (상태 기록)</label>
               <input name="funding_done_date" type="date" defaultValue={customer.funding_done_date ?? ""} className={inputCls} />
             </div>
           </div>
@@ -508,18 +513,16 @@ ${docLines}
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelCls}>첫 회차 입금일</label>
-              <input name="first_payment_date" type="date" defaultValue={customer.first_payment_date ?? ""} className={inputCls} />
+              <p className={labelCls}>첫 납부 예정일 (조회 전용)</p>
+              <p className="mt-2 text-sm text-navy-900">{customer.first_payment_date ?? "미입력"}</p>
             </div>
             <div>
-              <label className={labelCls}>총 렌탈 회차 (개월)</label>
-              <input name="rental_months" inputMode="numeric" defaultValue={customer.rental_months ?? ""} className={inputCls} placeholder="예: 36" />
+              <p className={labelCls}>총 렌탈 회차 (조회 전용)</p>
+              <p className="mt-2 text-sm text-navy-900">{customer.rental_months ?? "미입력"}</p>
             </div>
           </div>
-          <p className="mt-2 text-xs text-navy-400">
-            첫 입금일과 총 회차를 저장하면 매월 같은 날짜로 회차별 예정일이 생성됩니다.
-            입금 예정·연체는 대시보드 입금 인박스에서 확인합니다.
-          </p>
+          <p className="mt-3 text-xs text-navy-500">납부 일정·계약 총액·실제 수납은 아래 현금흐름 편집에서 사유를 입력하고 검토 후 저장합니다.</p>
+          <a href="#cashflow-editor" className="mt-2 inline-block text-sm text-brand-600 hover:underline">현금흐름 편집으로 이동 →</a>
         </CollapsibleCard>
 
         <CollapsibleCard
@@ -568,23 +571,27 @@ ${docLines}
         </CollapsibleCard>
       </AutosaveForm>
 
-      {/* 회차별 렌탈료 납부 현황 — 자동저장 폼 밖(별도 액션) */}
+      {/* Finance controls intentionally live outside the 500ms AutosaveForm. */}
       <CollapsibleCard
         title="회차별 렌탈료 납부 현황"
-        desc="회차를 눌러 입금 완료 처리합니다."
+        desc="조회 전용 · 기존 납부 표시와 실제 수납 원장을 구분합니다."
         open={openOperation}
       >
         <PaymentScheduleEditor
-          id={id}
+          hasLegacyLedger={customer.receipt_ledger != null}
+          receiptStatusUnavailable={"error" in cashflowResult}
           schedule={{
             first_payment_date: customer.first_payment_date,
             rental_months: customer.rental_months,
             paid_count: customer.paid_count,
             rental_price: customer.rental_price,
+            payment_schedule: customer.payment_schedule,
+            rental_receipts: customer.receipt_ledger != null ? [] : "ok" in cashflowResult ? cashflowResult.state.snapshot.movements.filter(row => row.kind === "rental_receipt" && row.basis === "actual") : undefined,
           }}
-          action={setPaidCount}
         />
       </CollapsibleCard>
+
+      <CashflowEditor customerId={id} initialResult={cashflowResult} saveAction={saveCustomerCashflow} loadAction={loadCustomerCashflow} />
 
       {/* 위험 구역 */}
       <CollapsibleCard title="고객 삭제" desc="이 작업은 되돌릴 수 없습니다.">

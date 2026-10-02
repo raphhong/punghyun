@@ -4,7 +4,7 @@ import { adminPath } from "@/lib/admin/config";
 import { STAGES, stageLabel, type StageKey } from "@/lib/admin/pipeline";
 import { daysBetween, dueLabel, nextDue, todayISO } from "@/lib/admin/payments";
 import { PaymentInbox, type PendingRow } from "@/components/admin/PaymentInbox";
-import { setPaidCount } from "./customers/actions";
+import type { CashMovement } from "@/lib/admin/cashflow-write";
 import type { Customer } from "@/lib/admin/types";
 
 // 인박스에 노출할 임박 범위(일). 연체는 항상 포함.
@@ -25,23 +25,50 @@ export default async function DashboardPage() {
   });
   const total = rows?.length ?? 0;
 
-  // 렌탈료 입금 인박스 — 첫 입금일이 설정된 건의 다음 미납 회차 중 연체·임박만.
-  const { data: schedRows } = await supabase
-    .from("customers")
-    .select(
-      "id, hospital_name, first_payment_date, rental_months, paid_count, rental_price",
-    )
-    .not("first_payment_date", "is", null);
+  // Finance sources are read only after explicit admin proof. Paginate to avoid
+  // silently dropping receipts or customers beyond PostgREST's default limit.
+  let schedRows: Customer[] = [];
+  const receiptsByCustomer = new Map<string, CashMovement[]>();
+  let inboxError: string | null = null;
+  if (canViewCashflow) {
+    try {
+      for (let from = 0; ; from += 500) {
+        const result = await supabase.from("customers").select("*")
+          .not("first_payment_date", "is", null).order("id").range(from, from + 499);
+        if (result.error || !result.data) { inboxError = "납부 일정을 확인하지 못해 입금 인박스를 표시할 수 없습니다."; break; }
+        schedRows.push(...result.data as Customer[]);
+        if (result.data.length < 500) break;
+      }
+      if (!inboxError) {
+        for (let from = 0; ; from += 500) {
+          const result = await supabase.from("cashflow_movements").select("*")
+            .eq("kind", "rental_receipt").eq("basis", "actual").order("id").range(from, from + 499);
+          if (result.error || !result.data) { inboxError = "실제 수납 원장을 확인하지 못해 미납 상태를 확정할 수 없습니다. 현금흐름에서 원장 준비 상태를 확인해 주세요."; break; }
+          for (const receipt of result.data as CashMovement[]) {
+            const existing = receiptsByCustomer.get(receipt.customer_id) ?? [];
+            existing.push(receipt); receiptsByCustomer.set(receipt.customer_id, existing);
+          }
+          if (result.data.length < 500) break;
+        }
+      }
+    } catch { inboxError = "납부 일정 또는 수납 원장 연결을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."; }
+  }
+  if (inboxError) schedRows = [];
 
   const today = todayISO();
   const inbox: PendingRow[] = [];
-  for (const c of (schedRows as Partial<Customer>[] | null) ?? []) {
+  for (const c of schedRows) {
+    // Legacy receipt-ledger allocations require reconciliation; neither a
+    // movement nor paid_count can establish an authoritative inbox status.
+    if (c.receipt_ledger != null) continue;
     const due = nextDue(
       {
         first_payment_date: c.first_payment_date ?? null,
         rental_months: c.rental_months ?? null,
         paid_count: c.paid_count ?? 0,
         rental_price: c.rental_price ?? null,
+        payment_schedule: c.payment_schedule,
+        rental_receipts: c.receipt_ledger != null ? [] : receiptsByCustomer.get(c.id) ?? [],
       },
       today,
     );
@@ -91,7 +118,8 @@ export default async function DashboardPage() {
         <span className="font-semibold">월별 현금흐름 보기 →</span>
         <span className="mt-1 block text-sm">누적 집행액 · 렌탈료 수납 · 채권사 지급 · 유동화 유입</span>
       </Link>}
-      <PaymentInbox items={inbox} action={setPaidCount} />
+      {canViewCashflow && schedRows.some(customer => customer.receipt_ledger != null) && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">기존 수납원장이 있는 고객은 원장 대조가 필요합니다. 수납 상태를 확정할 수 없어 아래 인박스 대상에서 제외했습니다.</p>}
+      {canViewCashflow && (inboxError ? <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{inboxError}</p> : <PaymentInbox items={inbox} />)}
 
       {/* 단계별 카드 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

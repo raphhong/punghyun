@@ -1,14 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { fmtWon, type PaymentStatus } from "@/lib/admin/payments";
-
-type SetPaidCount = (
-  id: string,
-  count: number,
-) => Promise<{ ok: true } | { error: string }>;
 
 export type PendingRow = {
   id: string;
@@ -30,32 +23,11 @@ const badgeStyle: Record<PaymentStatus, string> = {
   scheduled: "bg-navy-100 text-navy-500",
 };
 
-// 대시보드 렌탈료 입금 인박스 — 오늘/연체/임박 회차를 모아 보여주고,
-// [입금 확인] 한 번으로 해당 회차를 완납 처리(paid_count 증가)해 목록에서 정리한다.
-export function PaymentInbox({
-  items,
-  action,
-}: {
-  items: PendingRow[];
-  action: SetPaidCount;
-}) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-
+// The inbox only links to explicit, reviewed receipt entry; it never writes paid_count.
+export function PaymentInbox({ items }: { items: PendingRow[] }) {
   const overdue = items.filter((r) => r.status === "overdue").length;
   const today = items.filter((r) => r.status === "due_today").length;
   const sumDue = items.reduce((s, r) => s + (r.amount ?? 0), 0);
-
-  function confirm(row: PendingRow) {
-    startTransition(async () => {
-      const res = await action(row.id, row.no); // 해당 회차까지 완납
-      if ("error" in res) {
-        alert(res.error);
-        return;
-      }
-      router.refresh();
-    });
-  }
 
   return (
     <section className="overflow-hidden rounded-2xl border border-navy-100 bg-white">
@@ -73,7 +45,7 @@ export function PaymentInbox({
             </span>
           )}
           <span className="text-navy-500">
-            예상 입금 {fmtWon(sumDue)}
+            대상 회차 예정액 {fmtWon(sumDue)}
           </span>
         </div>
       </div>
@@ -108,14 +80,12 @@ export function PaymentInbox({
               <span className="text-sm font-semibold text-navy-800">
                 {fmtWon(row.amount)}
               </span>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => confirm(row)}
-                className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+              <Link
+                href={`${row.href}#cashflow-editor`}
+                className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
               >
-                입금 확인
-              </button>
+                수납 원장 확인·등록
+              </Link>
             </li>
           ))}
         </ul>
