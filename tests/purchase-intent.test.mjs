@@ -83,6 +83,7 @@ async function renderCustomer(docs = [], hospitalType = "individual", stage = "i
     "next/navigation": { notFound: () => { throw Error("not found"); } },
     "next/link": "a",
     "../actions": actions,
+    "../cashflow-actions": { loadCustomerCashflow: async () => ({ error: "이 테스트에서는 현금흐름 편집을 사용하지 않습니다.", code: "NOT_READY" }), saveCustomerCashflow: noop },
   });
   return { tree: await Page({ params: Promise.resolve({ id: customer.id }) }), signedCalls };
 }

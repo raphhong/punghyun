@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fmtWon } from "@/lib/admin/payments";
+import type { RentalStatus } from "@/lib/admin/commission-rental";
+export type { RentalStatus } from "@/lib/admin/commission-rental";
 
 type RecordAction = (
   customerId: string,
@@ -14,8 +16,6 @@ type RateAction = (
   customerId: string,
   rate: number | null,
 ) => Promise<{ ok: true } | { error: string }>;
-
-export type RentalStatus = "fully_paid" | "overdue" | "in_progress" | "none";
 
 export type CommissionDeal = {
   customerId: string;
@@ -35,6 +35,7 @@ const rentalStyle: Record<RentalStatus, string> = {
   overdue: "bg-red-100 text-red-700",
   in_progress: "bg-navy-100 text-navy-500",
   none: "bg-amber-50 text-amber-700",
+  unknown: "bg-navy-100 text-navy-500",
 };
 
 export function CommissionRow({
@@ -122,7 +123,7 @@ export function CommissionRow({
         <div className="mt-1">
           <span
             className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${rentalStyle[deal.rentalStatus]}`}
-            title="렌탈 진행 상황 (회수 판단용)"
+            title="렌탈 진행 상황 참고 · 과거 완납 표시는 실제 수납 증빙이 아닙니다. 회수 전 원장을 확인하세요."
           >
             {deal.rentalDetail}
           </span>
