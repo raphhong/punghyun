@@ -44,9 +44,24 @@ export function net(flows: Record<FlowKey, Amount>, basis: "Plan" | "Actual"): A
   return { value: incoming.value - outgoing.value, known: incoming.known + outgoing.known, missing: incoming.missing + outgoing.missing };
 }
 
-export function projectCashflow(customers: CashCustomer[], profiles: FundingProfile[], movements: Movement[], month: string, today = koreaToday()) {
+export function cashflowCustomers(customers: CashCustomer[], movements: Movement[], movementsAvailable = true) {
+  const recorded = new Set(movements.map(m => m.customer_id));
+  return customers.filter(c => {
+    const ledger = c.receipt_ledger;
+    // Preserve even incomplete historical evidence; this is scope, not proof of cash.
+    const receiptHistory = Number(c.paid_count) > 0 || (ledger != null && (
+      !object(ledger) || !Array.isArray(ledger.entries) || ledger.entries.length > 0 || Number(ledger.legacyPaidCount) > 0
+    ));
+    const history = recorded.has(c.id) || Boolean(c.funding_done) || Boolean(c.funding_done_date) || receiptHistory;
+    // Dates/amounts in an unexecuted proposal must not revive a cancelled contract.
+    if (c.stage === "closed") return history || !movementsAvailable;
+    return recorded.has(c.id) || Boolean(c.funding_done) || ["contract", "funding", "operation", "maturity"].includes(c.stage) || Boolean(c.first_payment_date) || Boolean(c.funding_scheduled_date);
+  });
+}
+
+export function projectCashflow(customers: CashCustomer[], profiles: FundingProfile[], movements: Movement[], month: string, today = koreaToday(), movementsAvailable = true) {
   if (!validMonth(month) || !validDate(today)) throw new Error("Invalid cashflow period");
-  const rows: CashRow[] = customers.filter(c => ["contract", "funding", "operation", "maturity", "closed"].includes(c.stage) || c.funding_done || c.first_payment_date || c.funding_scheduled_date || movements.some(m => m.customer_id === c.id)).map(c => {
+  const rows: CashRow[] = cashflowCustomers(customers, movements, movementsAvailable).map(c => {
     const profile = profiles.find(p => p.customer_id === c.id);
     const flows = Object.fromEntries(flowKeys.map(k => [k, empty()])) as Record<FlowKey, Amount>;
     const row: CashRow = { id: c.id, name: c.hospital_name || "상호 미입력", fundingType: profile?.funding_type ?? null, creditor: profile?.creditor_name ?? null, flows, cumulative: empty(), issues: [], details: [] };

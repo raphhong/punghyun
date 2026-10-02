@@ -3,7 +3,7 @@ import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { loadSource, customer } from './cashflow-loader.mjs';
-function setup({ uid = 'admin', admin = true, adminError = false, customerError = false, extraError = false, errorCode, throwQuery = false, count = 1 } = {}) {
+function setup({ uid = 'admin', admin = true, adminError = false, customerError = false, extraError = false, errorCode, throwQuery = false, count = 1, customerOverrides = {} } = {}) {
   const calls = [];
   const client = { auth: { getClaims: async () => ({ data: { claims: uid ? { sub: uid } : null } }) }, from(table) {
     calls.push(table);
@@ -12,7 +12,7 @@ function setup({ uid = 'admin', admin = true, adminError = false, customerError 
       range: async (a, b) => {
         if (throwQuery && table !== 'customers') throw new Error('private connection detail');
         if ((table === 'customers' && customerError) || (table !== 'customers' && extraError)) return { data: null, error: { code: errorCode, message: "private error detail" } };
-        return { error: null, data: table === 'customers' ? Array.from({ length: count }, (_, i) => customer({ id: `c${i}` })).slice(a, b + 1) : [] };
+        return { error: null, data: table === 'customers' ? Array.from({ length: count }, (_, i) => customer({ ...customerOverrides, id: `c${i}` })).slice(a, b + 1) : [] };
       } };
     return query;
   } };
@@ -24,6 +24,18 @@ function setup({ uid = 'admin', admin = true, adminError = false, customerError 
   return { calls, render: params => Page({ searchParams: Promise.resolve(params ?? { month: '2026-02' }) }) };
 }
 test('anonymous redirected before finance queries', async () => { const s = setup({ uid: null }); await assert.rejects(s.render(), /REDIRECT/); assert.equal(s.calls.length, 0); });
+
+test('unexecuted closed customers do not trigger source or missing-data warnings', async () => {
+ const r=await setup({customerOverrides:{stage:'closed',funding_done:false,funding_done_date:null,paid_count:0}}).render({month:'2026-10'});
+ assert.equal(r.props.report.rows.length,0); assert.deepEqual(r.props.warnings,[]);
+ assert.ok(r.props.chartMonths.every(m=>m.rows.length===0));
+});
+
+test('a failed movement lookup cannot prove a closed customer has no history', async () => {
+ const r=await setup({extraError:true,customerOverrides:{stage:'closed',funding_done:false,funding_done_date:null,paid_count:0}}).render({month:'2026-10'});
+ assert.equal(r.props.report.rows.length,1); assert.ok(r.props.report.cumulative.missing);
+ assert.ok(r.props.warnings.length); assert.ok(r.props.chartMonths.every(m=>m.rows.length===1));
+});
 test('nonadmin and failed permission lookup fail closed', async () => { for (const options of [{ admin: false }, { adminError: true }]) { const s = setup(options); const result = await s.render(); assert.equal(result.props.role, 'alert'); assert.deepEqual(s.calls, ['admins']); } });
 test('customer failure shows error not zero report', async () => { const r = await setup({ customerError: true }).render(); assert.equal(r.props.role, 'alert'); assert.equal(r.props.report, undefined); });
 test('missing extension tables warn and preserve uncertainty', async () => { const r = await setup({ extraError: true }).render(); assert.ok(r.props.warnings.length); assert.ok(r.props.report.totals.creditorActual.missing); });

@@ -3,6 +3,23 @@ import test from 'node:test';
 import { loadSource, customer, profile, movement } from './cashflow-loader.mjs';
 const { projectCashflow: project, amountText, validMonth, koreaToday } = loadSource('src/lib/admin/cashflow.ts');
 const run = (c = customer(), p = profile(), ms = [], month = '2026-02') => project([c], p ? [p] : [], ms, month, '2026-10-02');
+
+const cancelled = extra => customer({stage:'closed',funding_done:false,funding_done_date:null,paid_count:0,...extra});
+test('unexecuted cancelled proposals contribute neither amounts nor missing warnings', () => {
+ const r=run(cancelled(),profile());
+ assert.equal(r.rows.length,0); assert.equal(r.cumulative.missing,0);
+ assert.ok(Object.values(r.totals).every(a=>a.value===0&&a.missing===0));
+});
+test('closed contracts retain actual movements and historical cash', () => {
+ const r=run(cancelled(),profile(),[movement({kind:'funding_disbursement',basis:'actual',amount:1200000})]);
+ assert.equal(r.rows.length,1); assert.equal(r.cumulative.value,1200000); assert.equal(r.totals.fundingActual.value,1200000);
+});
+test('closed contracts with legacy receipts or execution evidence remain for reconciliation', () => {
+ for(const extra of [{funding_done:true},{funding_done_date:'2026-02-02'},{paid_count:1},{receipt_ledger:{legacyPaidCount:1,entries:[]}},{receipt_ledger:{legacyPaidCount:0,entries:[{id:'r',no:1,amount:100,receivedDate:'2026-02-02'}]}}]) {
+  assert.equal(run(cancelled(extra)).rows.length,1);
+ }
+ assert.equal(run(cancelled(),profile(),[movement()]).rows.length,1);
+});
 test('month end remains Jan31 Feb28 Mar31', () => {
   const r = run(); assert.equal(r.totals.rentalPlan.value, 1100000); assert.equal(r.rows[0].details[0].date, '2026-02-28');
   assert.equal(run(customer(), profile(), [], '2026-03').rows[0].details[0].date, '2026-03-31');

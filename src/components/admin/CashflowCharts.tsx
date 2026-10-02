@@ -4,8 +4,15 @@ import Link from "next/link";
 import { amountText, totalAmounts, type Amount, type FlowKey } from "@/lib/admin/cashflow";
 export type CashflowChartMonth = { month: string; totals: Record<FlowKey, Amount>; plannedNet: Amount; actualNet: Amount };
 type Tip = { month: string; label: string; amount: Amount };
+type ChartProps = { months: CashflowChartMonth[]; selectedMonth: string; basis: "planned" | "actual"; basePath: string };
+export function CashflowCharts(props: ChartProps) {
+  // Remount the interactive selection when its meaning or source values change.
+  // A planned amount must never survive a switch to the actual-cash view.
+  const context = JSON.stringify([props.basis, props.selectedMonth, props.months.map(m => [m.month, m.totals, m.plannedNet, m.actualNet])]);
+  return <CashflowChartsContent key={context} {...props} />;
+}
 export function chartMoney(a: Amount) { return a.missing && !a.known ? "미확인" : `${a.missing ? "확인분 " : ""}${a.value.toLocaleString("ko-KR")}원${a.missing ? " · 전체 금액 미확정" : ""}`; }
-export function CashflowCharts({ months, selectedMonth, basis, basePath }: { months: CashflowChartMonth[]; selectedMonth: string; basis: "planned" | "actual"; basePath: string }) {
+function CashflowChartsContent({ months, selectedMonth, basis, basePath }: ChartProps) {
   const [tip, setTip] = useState<Tip | null>(null);
   const suffix = basis === "actual" ? "Actual" : "Plan";
   const query = `&range=custom&from=${months[0].month}&to=${months[months.length-1].month}`;
