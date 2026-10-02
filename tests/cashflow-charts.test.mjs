@@ -7,6 +7,13 @@ const {cashflowPeriod}=loadSource('src/lib/admin/cashflow-period.ts');
 const {cashflowSourceFailure}=loadSource('src/lib/admin/cashflow-source.ts');
 const {projectCashflow}=loadSource('src/lib/admin/cashflow.ts');
 const {CashflowCharts}=loadSource('src/components/admin/CashflowCharts.tsx');
+
+test('tooltip state is scoped to basis, selected month, period and values',()=>{
+ const months=['2026-09','2026-10'].map(month=>({month,...projectCashflow([customer()],[profile()],[],month,'2026-10-02')}));
+ const props={months,selectedMonth:'2026-10',basis:'planned',basePath:'/cashflow'};
+ const key=CashflowCharts(props).key;
+ for(const change of [{basis:'actual'},{selectedMonth:'2026-09'},{months:months.slice(1)},{months:months.map(m=>({...m,plannedNet:{value:12,known:1,missing:0}}))}])assert.notEqual(CashflowCharts({...props,...change}).key,key);
+});
 test('3 6 12 periods cross years without losing months',()=>{for(const n of [3,6,12]){const p=cashflowPeriod('2027-08',String(n));assert.equal(p.months.length,n);assert.equal(p.end,'2027-08')}});
 test('custom range validation, bounded size and September floor',()=>{assert.equal(cashflowPeriod('2026-12','custom','2026-09','2026-12').months.length,4);assert.ok(cashflowPeriod('2026-12','custom','2026-12','2026-10').warning);assert.ok(cashflowPeriod('2026-12','custom','2000-01','2026-12').warning);assert.deepEqual(cashflowPeriod('1900-01','12').months,['2026-09']);assert.deepEqual(cashflowPeriod('2026-10','12').months,['2026-09','2026-10'])});
 test('diagnostics do not disclose unrecognized raw codes',()=>{assert.ok(!cashflowSourceFailure('cashflow_profiles',{code:'secret-123'}).includes('secret-123'))});
