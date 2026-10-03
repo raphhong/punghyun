@@ -12,8 +12,13 @@ export function ClickableRow({
   const router = useRouter();
   return (
     <tr
-      onClick={() => router.push(href)}
-      className="cursor-pointer hover:bg-navy-50"
+      data-clickable
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest("a,button,input,select,textarea,summary")) return;
+        if (window.getSelection()?.toString()) return;
+        router.push(href);
+      }}
+      className="cursor-pointer"
     >
       {children}
     </tr>

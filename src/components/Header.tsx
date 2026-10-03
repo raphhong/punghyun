@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { site } from "@/lib/site";
 import { Container } from "./Container";
 import { ButtonLink } from "./Button";
@@ -10,9 +10,10 @@ import { cn } from "@/lib/cn";
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-navy-100 bg-white/90 backdrop-blur-md">
+    <header onKeyDown={(event) => { if (event.key === "Escape" && open) { setOpen(false); menuButton.current?.focus(); } }} className="sticky top-0 z-50 border-b border-navy-100 bg-white/90 backdrop-blur-md">
       <Container className="flex h-16 items-center justify-between">
         <Link href="/" aria-label="풍현 홈">
           <Logo />
@@ -38,8 +39,10 @@ export function Header() {
 
         <button
           type="button"
-          className="grid h-10 w-10 place-items-center rounded-lg text-navy-800 hover:bg-navy-50 md:hidden"
-          aria-label="메뉴 열기"
+          className="grid h-11 w-11 place-items-center rounded-lg text-navy-800 hover:bg-navy-50 md:hidden"
+          ref={menuButton}
+          aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
+          aria-controls="public-navigation"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
@@ -68,7 +71,7 @@ export function Header() {
       </Container>
 
       {open && (
-        <div className="border-t border-navy-100 bg-white md:hidden">
+        <nav id="public-navigation" aria-label="모바일 주요 메뉴" className="border-t border-navy-100 bg-white md:hidden">
           <Container className="flex flex-col gap-1 py-4">
             {site.nav.map((item) => (
               <Link
@@ -80,11 +83,11 @@ export function Header() {
                 {item.label}
               </Link>
             ))}
-            <ButtonLink href="/contact" className="mt-2 w-full">
+            <ButtonLink href="/contact" className="mt-2 w-full" onClick={() => setOpen(false)}>
               상담 신청
             </ButtonLink>
           </Container>
-        </div>
+        </nav>
       )}
     </header>
   );

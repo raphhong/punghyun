@@ -1,40 +1,40 @@
 /* Pretendard 폰트는 layout.tsx의 <link preconnect>로 로드 (렌더 블로킹 방지) */
 @import "tailwindcss";
+@import "../../design-system/tokens.css";
+@import "../../design-system/components.css";
 
-@theme {
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
-    system-ui, "Segoe UI", Roboto, "Helvetica Neue", "Apple SD Gothic Neo",
-    "Noto Sans KR", sans-serif;
+@theme inline {
+  --font-sans: var(--ph-semantic-font-web);
 
-  /* 브랜드 컬러 — 신뢰감 있는 딥 네이비 + 그린 포인트 */
-  --color-navy-50: #eef2f7;
-  --color-navy-100: #d6dfea;
-  --color-navy-200: #adbfd5;
-  --color-navy-300: #7f99b8;
-  --color-navy-400: #4f6a93;
-  --color-navy-500: #2f4a72;
-  --color-navy-600: #1d3357;
-  --color-navy-700: #14284a;
-  --color-navy-800: #0e1e3a;
-  --color-navy-900: #0a1830;
-  --color-navy-950: #061020;
+  /* Existing utility palette: generated base tokens, retained for gradual migration. */
+  --color-navy-50: var(--ph-base-color-navy-50);
+  --color-navy-100: var(--ph-base-color-navy-100);
+  --color-navy-200: var(--ph-base-color-navy-200);
+  --color-navy-300: var(--ph-base-color-navy-300);
+  --color-navy-400: var(--ph-base-color-navy-400);
+  --color-navy-500: var(--ph-base-color-navy-500);
+  --color-navy-600: var(--ph-base-color-navy-600);
+  --color-navy-700: var(--ph-base-color-navy-700);
+  --color-navy-800: var(--ph-base-color-navy-800);
+  --color-navy-900: var(--ph-base-color-navy-900);
+  --color-navy-950: var(--ph-base-color-navy-950);
 
   /* 브랜드 포인트 = 로고 딥네이비(#03265a) 계열로 통일 */
-  --color-brand-50: #eef2f8;
-  --color-brand-100: #d4deee;
-  --color-brand-200: #a9bddc;
-  --color-brand-300: #7695c4;
-  --color-brand-400: #3f66a0;
-  --color-brand-500: #1b4680;
-  --color-brand-600: #0d3468;
-  --color-brand-700: #03265a;
-  --color-brand-800: #05204c;
-  --color-brand-900: #06193a;
+  --color-brand-50: var(--ph-base-color-brand-50);
+  --color-brand-100: var(--ph-base-color-brand-100);
+  --color-brand-200: var(--ph-base-color-brand-200);
+  --color-brand-300: var(--ph-base-color-brand-300);
+  --color-brand-400: var(--ph-base-color-brand-400);
+  --color-brand-500: var(--ph-base-color-brand-500);
+  --color-brand-600: var(--ph-base-color-brand-600);
+  --color-brand-700: var(--ph-base-color-brand-700);
+  --color-brand-800: var(--ph-base-color-brand-800);
+  --color-brand-900: var(--ph-base-color-brand-900);
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a1830;
+  --background: var(--ph-semantic-color-fill-canvas);
+  --foreground: var(--ph-semantic-color-text-primary);
 }
 
 html {
@@ -49,9 +49,5 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* 히어로 배경 그라디언트 */
-.bg-hero-grid {
-  background-image:
-    radial-gradient(60% 60% at 50% 0%, rgba(43, 92, 170, 0.22) 0%, rgba(10, 24, 48, 0) 70%),
-    linear-gradient(180deg, #0a1830 0%, #0e1e3a 100%);
-}
+/* Quiet brand surface; logo colors remain unchanged. */
+.bg-hero-grid { background:var(--ph-semantic-color-fill-dark); }

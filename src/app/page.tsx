@@ -26,7 +26,7 @@ export default function Home() {
       <section className="bg-hero-grid text-white">
         <Container className="py-24 sm:py-32 lg:py-36">
           <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm font-medium text-brand-200">
+            <span className="text-sm font-medium text-navy-200">
               자산 기반 렌탈·선정산 서비스
             </span>
             <h1 className="mt-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
@@ -86,22 +86,19 @@ export default function Home() {
           title="3단계로 끝나는 자금 확보"
           description="매입 → 렌탈 → 만기 후 방안 선택"
         />
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
+        <ol className="ph-process mt-12">
           {steps.map((s) => (
-            <div
-              key={s.step}
-              className="relative rounded-2xl border border-navy-100 bg-white p-8 shadow-sm"
-            >
-              <span className="text-4xl font-bold text-brand-200">
+            <li key={s.step}>
+              <span className="text-sm font-semibold text-brand-700">
                 {s.step}
               </span>
               <h3 className="mt-4 text-xl font-bold text-navy-900">
                 {s.title}
               </h3>
               <p className="mt-3 leading-relaxed text-navy-600">{s.desc}</p>
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
         <div className="mt-10 text-center">
           <ButtonLink href="/service" variant="ghost">
             이용 절차 자세히 보기
@@ -135,16 +132,10 @@ export default function Home() {
           title="사업자 편에 서는 든든한 파트너"
           description="빠르고, 유연하고, 투명하게. 사업의 지속을 최우선으로 생각합니다."
         />
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="ph-feature-list mt-12">
           {benefits.map((b) => (
-            <div
-              key={b.title}
-              className="rounded-2xl border border-navy-100 bg-white p-7"
-            >
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-brand-500/10 text-brand-600">
-                <Icon name={b.icon} />
-              </div>
-              <h3 className="mt-5 text-lg font-bold text-navy-900">
+            <div key={b.title}>
+              <h3 className="text-lg font-bold text-navy-900">
                 {b.title}
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-navy-600">
@@ -163,16 +154,10 @@ export default function Home() {
           description="안전하고 투명하게. 실물 자산 기반의 체계적인 서비스입니다."
           invert
         />
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
+        <div className="ph-trust-list mt-12">
           {trustPoints.map((t) => (
-            <div
-              key={t.title}
-              className="rounded-2xl border border-white/10 bg-white/5 p-7"
-            >
-              <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-500/20 text-brand-300">
-                <Icon name="check" className="h-5 w-5" />
-              </div>
-              <h3 className="mt-5 text-lg font-bold text-white">{t.title}</h3>
+            <div key={t.title}>
+              <h3 className="text-lg font-bold text-white">{t.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-navy-300">
                 {t.desc}
               </p>
@@ -183,7 +168,7 @@ export default function Home() {
 
       {/* CTA */}
       <Section className="bg-white">
-        <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-navy-800 to-navy-950 px-8 py-14 text-center sm:px-16 sm:py-20">
+        <div className="overflow-hidden rounded-xl bg-navy-900 px-8 py-14 text-center sm:px-16 sm:py-20">
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
             우리 사업에 맞는지 확인해보세요
           </h2>
