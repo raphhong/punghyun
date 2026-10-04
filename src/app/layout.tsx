@@ -107,7 +107,7 @@ export default async function RootLayout({
         <head>
           <FontLinks />
         </head>
-        <body className="min-h-full bg-navy-50">{children}</body>
+        <body className="ph-scope min-h-full bg-navy-50">{children}</body>
       </html>
     );
   }
@@ -117,7 +117,7 @@ export default async function RootLayout({
       <head>
         <FontLinks />
       </head>
-      <body className="flex min-h-full flex-col bg-white">
+      <body className="ph-scope flex min-h-full flex-col bg-white">
         <JsonLd data={organizationLd} />
         <Header />
         <main className="flex-1">{children}</main>

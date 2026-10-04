@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ClickableRow } from "@/components/admin/ClickableRow";
+import { CustomerTable } from "@/components/admin/CustomerTable";
+import { Feedback } from "@/components/ui/Feedback";
 import { adminPath } from "@/lib/admin/config";
 import {
   STAGE_MAP,
@@ -8,10 +9,6 @@ import {
   type StageKey,
 } from "@/lib/admin/pipeline";
 import type { Customer } from "@/lib/admin/types";
-
-function fmtDate(v: string | null) {
-  return v ?? "-";
-}
 
 export default async function CustomersPage({
   searchParams,
@@ -57,87 +54,19 @@ export default async function CustomersPage({
         </div>
         <Link
           href={adminPath("customers/new")}
-          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+          className="ph-button ph-button--primary"
         >
           + 고객 추가
         </Link>
       </div>
 
       {error && (
-        <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <Feedback tone="warning" urgent>
           데이터를 불러오지 못했습니다. Supabase 설정을 확인하세요. ({error.message})
-        </p>
+        </Feedback>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-navy-100 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="bg-navy-50 text-navy-500">
-              <tr>
-                <th className="px-4 py-3 font-medium">상호</th>
-                <th className="px-4 py-3 font-medium">대표자</th>
-                <th className="px-4 py-3 font-medium">연락처</th>
-                <th className="px-4 py-3 font-medium">유형</th>
-                <th className="px-4 py-3 font-medium">필요자금</th>
-                <th className="px-4 py-3 font-medium">단계</th>
-                <th className="px-4 py-3 font-medium">담당 영업자</th>
-                <th className="px-4 py-3 font-medium">인입일</th>
-                <th className="px-4 py-3 font-medium">경로</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-navy-100">
-              {customers?.map((c: Partial<Customer>) => (
-                <ClickableRow
-                  key={c.id}
-                  href={adminPath(`customers/${c.id}`)}
-                >
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-navy-900">
-                      {c.hospital_name || "(미입력)"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-navy-600">
-                    {c.representative || "-"}
-                  </td>
-                  <td className="px-4 py-3 text-navy-600">{c.phone || "-"}</td>
-                  <td className="px-4 py-3 text-navy-600">
-                    {c.hospital_type === "individual"
-                      ? "개인"
-                      : c.hospital_type === "corporate"
-                        ? "법인"
-                        : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-navy-600">
-                    {c.needed_funds || "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-navy-100 px-2.5 py-1 text-xs font-medium text-navy-700">
-                      {stageLabel(c.stage as StageKey)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-navy-600">
-                    {c.sales_agent_id
-                      ? agentName.get(c.sales_agent_id) ?? "-"
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-navy-600">
-                    {fmtDate(c.intake_date ?? null)}
-                  </td>
-                  <td className="px-4 py-3 text-navy-500">
-                    {c.source === "homepage" ? "공홈" : "수동"}
-                  </td>
-                </ClickableRow>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {(!customers || customers.length === 0) && !error && (
-          <p className="px-4 py-12 text-center text-sm text-navy-400">
-            해당 단계의 고객이 없습니다.
-          </p>
-        )}
-      </div>
+      <CustomerTable customers={(customers ?? []) as Partial<Customer>[]} agentName={agentName} failed={!!error} />
     </div>
   );
 }
