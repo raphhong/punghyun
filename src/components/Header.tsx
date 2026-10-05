@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
 import { site } from "@/lib/site";
 import { Container } from "./Container";
@@ -10,21 +11,24 @@ import { cn } from "@/lib/cn";
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
   const menuButton = useRef<HTMLButtonElement>(null);
 
   return (
-    <header onKeyDown={(event) => { if (event.key === "Escape" && open) { setOpen(false); menuButton.current?.focus(); } }} className="sticky top-0 z-50 border-b border-navy-100 bg-white/90 backdrop-blur-md">
-      <Container className="flex h-16 items-center justify-between">
-        <Link href="/" aria-label="풍현 홈">
+    <header onKeyDown={(event) => { if (event.key === "Escape" && open) { setOpen(false); menuButton.current?.focus(); } }} className="ph-public-header sticky top-0 z-50 border-b border-navy-100">
+      <Container className="ph-header-inner flex items-center justify-between">
+        <Link href="/" aria-label="풍현 홈" className="flex items-center">
           <Logo />
+          <span className="ph-header-descriptor">자산 기반 렌탈</span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="주요 메뉴">
-          {site.nav.map((item) => (
+          {site.nav.filter((item) => item.href !== "/contact").map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-full px-4 py-2 text-sm font-medium text-navy-700 transition-colors hover:bg-navy-50 hover:text-navy-900"
+              aria-current={pathname === item.href ? "page" : undefined}
+              className="ph-header-link"
             >
               {item.label}
             </Link>

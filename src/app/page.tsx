@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { site } from "@/lib/site";
-import { steps, benefits, trustPoints } from "@/lib/content";
+import { steps } from "@/lib/content";
 import { Container } from "@/components/Container";
-import { Section, SectionHeader } from "@/components/Section";
 import { ButtonLink } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { JsonLd } from "@/components/JsonLd";
 import { Calculator } from "@/components/Calculator";
+import { AssetContinuity } from "@/components/AssetContinuity";
 
 const webPageLd = {
   "@context": "https://schema.org",
@@ -19,177 +19,73 @@ const webPageLd = {
 
 export default function Home() {
   return (
-    <>
+    <div className="ph-home">
       <JsonLd data={webPageLd} />
-
-      {/* 히어로 */}
-      <section className="bg-hero-grid text-white">
-        <Container className="py-24 sm:py-32 lg:py-36">
-          <div className="mx-auto max-w-3xl text-center">
-            <span className="text-sm font-medium text-navy-200">
-              자산 기반 렌탈·선정산 서비스
-            </span>
-            <h1 className="mt-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-              정산은 기다리고,
-              <br />
-              <span className="text-brand-300">자금은 지금.</span>
-            </h1>
-            <p className="mx-auto mt-6 max-w-xl text-balance text-lg leading-relaxed text-navy-200">
-              기존 보유 자산을 활용해 필요한 운영 자금을 확보하세요. 기존 자산
-              사용은 계속, 자금은 즉시 입금. 풍현이 사업자의 자금 흐름을 든든하게
-              뒷받침 하겠습니다.
-            </p>
-            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <ButtonLink href="/contact" size="lg">
-                상담 신청하기
-                <Icon name="arrow" className="h-5 w-5" />
-              </ButtonLink>
-              <ButtonLink href="/service" size="lg" variant="secondary">
-                서비스 자세히 보기
-              </ButtonLink>
+      <section className="ph-home-hero" aria-labelledby="home-title">
+        <Container>
+          <div className="ph-hero-layout">
+            <div className="ph-hero-copy">
+              <p className="ph-eyebrow">기업 자산 활용 · 세일앤렌탈백</p>
+              <h1 id="home-title">장비는 계속 쓰고,<br /><span>운영자금은 새롭게.</span></h1>
+              <p className="ph-hero-description">보유한 장비·설비를 매각해 필요한 자금을 확보하고,<br className="ph-desktop-break" /> 렌탈로 계속 사용하세요. 사업의 흐름은 이어집니다.</p>
+              <div className="ph-hero-actions">
+                <ButtonLink href="/contact" size="lg">우리 사업 상담하기<Icon name="arrow" className="h-4 w-4" /></ButtonLink>
+                <Link href="#calculator" className="ph-text-link">예상 한도 확인<Icon name="arrow" className="h-4 w-4" /></Link>
+              </div>
+              <p className="ph-hero-disclaimer">실제 지급 금액과 조건은 자산 심사·상담 후 결정됩니다.</p>
             </div>
-            <p className="mt-6 text-sm text-navy-300">
-              전화 상담{" "}
-              <a
-                href={site.contact.phoneHref}
-                className="font-semibold text-white hover:underline"
-              >
-                {site.contact.phone}
-              </a>{" "}
-              · {site.contact.hours}
-            </p>
+            <AssetContinuity />
           </div>
+          <dl className="ph-service-at-a-glance">
+            <div><dt>자금 확보</dt><dd>보유 자산의 매입대금으로</dd></div>
+            <div><dt>사업 운영</dt><dd>기존 장비를 계속 사용하며</dd></div>
+            <div><dt>만기 처리</dt><dd>계약 시 선택한 방식으로</dd></div>
+          </dl>
         </Container>
       </section>
 
-      {/* 문제 제기 */}
-      <Section className="bg-white">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">
-            이런 고민, 있으신가요?
-          </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-navy-900 sm:text-4xl">
-            정산은 아직인데,
-            <br className="sm:hidden" /> 자금은 지금 필요하신가요?
-          </h2>
-          <p className="mt-5 text-balance text-lg leading-relaxed text-navy-600">
-            매출은 지속 발생하지만, 당장 필요 운영자금을 확보하기에는 기존 금융
-            프로그램의 절차는 문턱이 높고 복잡합니다. 풍현은 보유하신 자산을
-            활용하여 더 빠르고, 적합한 대안을 제시합니다.
-          </p>
-        </div>
-      </Section>
-
-      {/* 서비스 3단계 프로세스 */}
-      <Section className="bg-navy-50">
-        <SectionHeader
-          title="3단계로 끝나는 자금 확보"
-          description="매입 → 렌탈 → 만기 후 방안 선택"
-        />
-        <ol className="ph-process mt-12">
-          {steps.map((s) => (
-            <li key={s.step}>
-              <span className="text-sm font-semibold text-brand-700">
-                {s.step}
-              </span>
-              <h3 className="mt-4 text-xl font-bold text-navy-900">
-                {s.title}
-              </h3>
-              <p className="mt-3 leading-relaxed text-navy-600">{s.desc}</p>
-            </li>
-          ))}
-        </ol>
-        <div className="mt-10 text-center">
-          <ButtonLink href="/service" variant="ghost">
-            이용 절차 자세히 보기
-            <Icon name="arrow" className="h-4 w-4" />
-          </ButtonLink>
-        </div>
-      </Section>
-
-      {/* 예상 한도 계산기 */}
-      <Section className="bg-white" id="calculator">
-        <SectionHeader
-          eyebrow="1분 예상 조회"
-          title="얼마나 받을 수 있을까요?"
-          description="카드매출과 보유 자산만 입력하면 예상 지급 가능 금액을 바로 확인할 수 있습니다."
-        />
-        <div className="mt-12">
-          <Calculator />
-        </div>
-        <div className="mt-8 text-center">
-          <ButtonLink href="/calculator" variant="ghost">
-            계산기 자세히 보기
-            <Icon name="arrow" className="h-4 w-4" />
-          </ButtonLink>
-        </div>
-      </Section>
-
-      {/* 강점 */}
-      <Section className="bg-navy-50">
-        <SectionHeader
-          eyebrow="왜 풍현인가"
-          title="사업자 편에 서는 든든한 파트너"
-          description="빠르고, 유연하고, 투명하게. 사업의 지속을 최우선으로 생각합니다."
-        />
-        <div className="ph-feature-list mt-12">
-          {benefits.map((b) => (
-            <div key={b.title}>
-              <h3 className="text-lg font-bold text-navy-900">
-                {b.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-navy-600">
-                {b.desc}
-              </p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* 신뢰 */}
-      <Section className="bg-navy-900 text-white">
-        <SectionHeader
-          eyebrow="신뢰와 안정"
-          title="실전에서 검증된 운영 역량으로"
-          description="안전하고 투명하게. 실물 자산 기반의 체계적인 서비스입니다."
-          invert
-        />
-        <div className="ph-trust-list mt-12">
-          {trustPoints.map((t) => (
-            <div key={t.title}>
-              <h3 className="text-lg font-bold text-white">{t.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-navy-300">
-                {t.desc}
-              </p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* CTA */}
-      <Section className="bg-white">
-        <div className="overflow-hidden rounded-xl bg-navy-900 px-8 py-14 text-center sm:px-16 sm:py-20">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            우리 사업에 맞는지 확인해보세요
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-navy-200">
-            간단한 정보만 남겨주시면 담당자가 연락드려 맞춤 상담을 진행합니다.
-            상담은 무료이며, 부담 없이 문의하세요.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <ButtonLink href="/contact" size="lg">
-              지금 상담 신청하기
-              <Icon name="arrow" className="h-5 w-5" />
-            </ButtonLink>
-            <Link
-              href={site.contact.phoneHref}
-              className="text-sm font-semibold text-navy-200 hover:text-white"
-            >
-              전화로 문의: {site.contact.phone}
-            </Link>
+      <section className="ph-home-section" aria-labelledby="service-title">
+        <Container className="ph-service-layout">
+          <div className="ph-section-intro">
+            <p className="ph-eyebrow">풍현의 서비스</p>
+            <h2 id="service-title">자산의 가치를<br />사업의 다음 자금으로.</h2>
+            <p>세일앤렌탈백은 보유 자산의 매입과 렌탈이 이어지는 구조입니다. 자산을 활용하면서 운영을 지속할 수 있습니다.</p>
+            <Link href="/service" className="ph-text-link">서비스 전체 안내<Icon name="arrow" className="h-4 w-4" /></Link>
           </div>
-        </div>
-      </Section>
-    </>
+          <ol className="ph-service-timeline">
+            {steps.map((step) => (
+              <li key={step.step}>
+                <div><h3>{step.title}</h3><p>{step.desc}</p></div>
+              </li>
+            ))}
+          </ol>
+        </Container>
+      </section>
+
+      <section className="ph-contract-section" aria-labelledby="contract-title">
+        <Container>
+          <div className="ph-contract-heading"><p className="ph-eyebrow">계약 시 선택하는 두 가지 방식</p><h2 id="contract-title">만기에 어떻게 할지,<br className="ph-mobile-break" /> 처음부터 명확하게.</h2></div>
+          <div className="ph-contract-options">
+            <div><span className="ph-contract-label">렌탈형</span><h3>사용하고, 반납합니다.</h3><p>계약 기간 동안 자산을 렌탈로 이용하고,<br />만기에 자산을 반납하는 방식입니다.</p><span className="ph-contract-end">만기 처리 <strong>자산 반납</strong></span></div>
+            <div><span className="ph-contract-label">할부매입형</span><h3>사용하고, 소유합니다.</h3><p>계약 기간 동안 자산을 이용하고,<br />만기에 잔금을 완납해 소유권을 취득합니다.</p><span className="ph-contract-end">만기 처리 <strong>잔금 완납 후 소유권 취득</strong></span></div>
+          </div>
+          <p className="ph-contract-footnote">두 방식 모두 계약 시점에 선택합니다. 세부 조건은 상담 시 안내합니다.</p>
+        </Container>
+      </section>
+
+      <section className="ph-home-section ph-calculator-section" id="calculator" aria-labelledby="calculator-title">
+        <Container>
+          <div className="ph-calculator-heading"><div><p className="ph-eyebrow">예상 한도 확인</p><h2 id="calculator-title">우리 사업은 얼마나<br className="ph-mobile-break" /> 활용할 수 있을까요?</h2></div><p>최근 3개월 카드매출과 보유 자산 규모를 입력하면<br className="ph-desktop-break" /> 참고용 예상 금액을 확인할 수 있습니다.</p></div>
+          <Calculator className="ph-home-calculator" showDisclaimer={false} />
+        </Container>
+      </section>
+
+      <section className="ph-home-contact" aria-labelledby="contact-title">
+        <Container className="ph-contact-layout">
+          <div><p className="ph-eyebrow">사업에 맞는 방법을 함께 찾습니다</p><h2 id="contact-title">보유 자산과 필요한 자금,<br />풍현에 이야기해주세요.</h2><p>담당자가 자산과 사업 현황을 확인하고 적합한 이용 조건을 안내합니다.</p></div>
+          <div className="ph-contact-actions"><ButtonLink href="/contact" size="lg">상담 신청하기<Icon name="arrow" className="h-4 w-4" /></ButtonLink><a href={site.contact.phoneHref}>{site.contact.phone}<span>{site.contact.hours}</span></a></div>
+        </Container>
+      </section>
+    </div>
   );
 }

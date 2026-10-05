@@ -18,7 +18,7 @@ const cardPresets = [
   { label: "3억원", value: 300_000_000 },
 ];
 
-export function Calculator({ className }: { className?: string }) {
+export function Calculator({ className, showDisclaimer = true }: { className?: string; showDisclaimer?: boolean }) {
   const [cardSales3m, setCardSales3m] = useState<number>(0);
   const [assetValue, setAssetValue] = useState<number>(0);
 
@@ -70,6 +70,7 @@ export function Calculator({ className }: { className?: string }) {
                 key={p.value}
                 type="button"
                 onClick={() => setCardSales3m(p.value)}
+                aria-pressed={cardSales3m === p.value}
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                   cardSales3m === p.value
@@ -104,6 +105,7 @@ export function Calculator({ className }: { className?: string }) {
                 key={opt.value}
                 type="button"
                 onClick={() => setAssetValue(opt.value)}
+                aria-pressed={assetValue === opt.value}
                 className={cn(
                   "rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors",
                   assetValue === opt.value
@@ -119,19 +121,19 @@ export function Calculator({ className }: { className?: string }) {
       </div>
 
       {/* 결과 */}
-      <div className="flex flex-col rounded-2xl bg-gradient-to-br from-navy-800 to-navy-950 p-6 text-white sm:p-8">
-        <p className="text-sm font-medium text-brand-200">예상 지급 가능 금액</p>
+      <div className="ph-calculator-result flex flex-col rounded-2xl bg-gradient-to-br from-navy-800 to-navy-950 p-6 text-white sm:p-8">
+        <p className="ph-result-label text-sm font-medium text-brand-200">예상 지급 가능 금액</p>
 
         {ready ? (
           <>
             <div className="mt-3">
-              <p className="text-3xl font-bold tracking-tight sm:text-4xl">
+              <p className="ph-result-amount text-3xl font-bold tracking-tight sm:text-4xl">
                 {formatKRW(result.estimateLow)}
                 <span className="mx-1.5 text-navy-400">~</span>
                 {formatKRW(result.estimateHigh)}
               </p>
             </div>
-            <dl className="mt-6 space-y-3 border-t border-white/10 pt-6 text-sm">
+            <dl className="ph-result-breakdown mt-6 space-y-3 border-t border-white/10 pt-6 text-sm">
               <div className="flex items-center justify-between">
                 <dt className="text-navy-300">카드매출 기준 한도</dt>
                 <dd className="font-semibold text-white">
@@ -153,7 +155,7 @@ export function Calculator({ className }: { className?: string }) {
             </dl>
             <Link
               href="/contact"
-              className="mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-500 px-6 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+              className="ph-result-contact mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand-500 px-6 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
             >
               이 조건으로 상담 신청
               <Icon name="arrow" className="h-4 w-4" />
@@ -161,20 +163,20 @@ export function Calculator({ className }: { className?: string }) {
           </>
         ) : (
           <div className="mt-3 flex flex-1 flex-col justify-center">
-            <p className="text-2xl font-bold text-navy-500 sm:text-3xl">
-              _ _ _ 원
+            <p className="ph-result-empty-title text-2xl font-bold text-navy-500 sm:text-3xl">
+              예상 금액을 확인해보세요
             </p>
-            <p className="mt-3 text-sm text-navy-400">
+            <p className="ph-result-empty-description mt-3 text-sm text-navy-400">
               카드매출과 보유 자산을 입력하면 예상 금액이 계산됩니다.
             </p>
           </div>
         )}
 
-        <p className="mt-6 text-[11px] leading-relaxed text-navy-400">
+        {showDisclaimer && <p className="ph-result-disclaimer mt-6 text-[11px] leading-relaxed text-navy-400">
           ※ 안전계수 {Math.round(calcConfig.safetyFactor * 100)}% 적용, 두 한도 중
           낮은 값 기준의 참고 예상치입니다. 실제 지급 금액과 조건은 자산 심사·상담을
           통해 결정됩니다.
-        </p>
+        </p>}
       </div>
     </div>
   );
