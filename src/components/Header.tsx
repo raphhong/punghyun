@@ -77,7 +77,7 @@ export function Header() {
       {open && (
         <nav id="public-navigation" aria-label="모바일 주요 메뉴" className="border-t border-navy-100 bg-white md:hidden">
           <Container className="flex flex-col gap-1 py-4">
-            {site.nav.map((item) => (
+            {site.nav.filter((item) => item.href !== "/contact").map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

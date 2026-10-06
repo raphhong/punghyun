@@ -1,6 +1,8 @@
 /* Public-site composition: the original P identity, an asset-flow diagram,
    and a deliberate reading order. No decorative motion or stock dashboard UI. */
-@layer components {
+/* These scoped overrides must win over utility classes on shared components. */
+@layer theme, base, components, utilities, ph-marketing;
+@layer ph-marketing {
   .ph-public-header { background:#fff; }
   .ph-public-header .ph-header-inner { height:80px; }
   .ph-header-descriptor { border-left:1px solid #d8dfe7; padding-left:18px; margin-left:18px; font-size:12px; color:#627084; }

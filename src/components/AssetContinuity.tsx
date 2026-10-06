@@ -3,7 +3,7 @@ export function AssetContinuity() {
   return (
     <figure className="ph-asset-diagram" aria-labelledby="asset-diagram-title">
       <figcaption id="asset-diagram-title">
-        <span>세일앤렌탈백 구조</span>
+        <span>자산 매각과 렌탈의 흐름</span>
       </figcaption>
       <div className="ph-asset-drawing" aria-hidden="true">
         <svg viewBox="0 0 460 220" fill="none">
