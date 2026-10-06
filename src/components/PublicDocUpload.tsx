@@ -1,127 +1,31 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@/lib/supabase/client";
-import { createDocUploadUrl, recordDocUpload } from "@/app/s/[token]/actions";
+import { MultiDocUpload } from "@/components/documents/MultiDocUpload";
+import { AttachmentList } from "@/components/documents/AttachmentList";
+import type { AttachmentView } from "@/lib/documents/presentation";
+import { createDocUploadUrl, recordDocUpload, deleteDocByToken, restoreDocByToken } from "@/app/s/[token]/actions";
 
-type Status = "idle" | "uploading" | "done" | "error";
-
-export function PublicDocUpload({
-  token,
-  docKey,
-  category,
-  label,
-  hint,
-  done: initialDone,
-  fileUrl,
-}: {
+export function PublicDocUpload({ token, docKey, category, label, hint, files }: {
   token: string;
   docKey: string;
   category: string;
   label: string;
   hint?: string;
-  done: boolean;
-  fileUrl?: string;
+  files: AttachmentView[];
 }) {
-  const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [status, setStatus] = useState<Status>(initialDone ? "done" : "idle");
-  const [msg, setMsg] = useState<string>("");
-
-  async function handleUpload() {
-    if (!file) return;
-    setStatus("uploading");
-    setMsg("");
-
-    try {
-      const signed = await createDocUploadUrl(token, docKey, file.name);
-      if ("error" in signed) {
-        setStatus("error");
-        setMsg(signed.error);
-        return;
-      }
-
-      const supabase = createBrowserClient();
-      const { error: upErr } = await supabase.storage
-        .from("customer-docs")
-        .uploadToSignedUrl(signed.path, signed.token, file);
-      if (upErr) {
-        setStatus("error");
-        setMsg("업로드 실패: " + upErr.message);
-        return;
-      }
-
-      const rec = await recordDocUpload(token, docKey, category, signed.path);
-      if ("error" in rec) {
-        setStatus("error");
-        setMsg(rec.error);
-        return;
-      }
-
-      setStatus("done");
-      setFile(null);
-      router.refresh();
-    } catch (e) {
-      setStatus("error");
-      setMsg(e instanceof Error ? e.message : "알 수 없는 오류");
-    }
-  }
-
-  const done = status === "done";
-
+  const count = files.filter((file) => !file.deletedAt).length;
   return (
-    <li className="rounded-xl border border-navy-100 p-3">
-      <div className="mb-2 flex items-center gap-2">
-        <span
-          className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-            done ? "bg-brand-500 text-white" : "bg-navy-100 text-transparent"
-          }`}
-        >
-          ✓
-        </span>
-        <span className="text-sm font-medium text-navy-800">{label}</span>
-        {done && <span className="text-xs text-brand-600">업로드됨</span>}
-        {fileUrl && (
-          <span className="ml-auto inline-flex gap-2">
-            <a
-              href={fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-medium text-brand-600 hover:underline"
-            >
-              보기
-            </a>
-            <a
-              href={`${fileUrl}&download`}
-              className="text-xs font-medium text-navy-500 hover:underline"
-            >
-              다운로드
-            </a>
-          </span>
-        )}
+    <li className="space-y-3 rounded-xl border border-navy-100 p-3">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-navy-800">{label}</span>
+          <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-500">첨부 {count}개</span>
+        </div>
+        {hint && <p className="mt-1 text-xs leading-relaxed text-navy-500">{hint}</p>}
+        {docKey === "tax_payment_cert" && <p className="mt-1 text-xs text-amber-700">국세와 지방세 증명서를 모두 첨부해 주세요. 파일 수만으로 서류가 모두 갖춰졌는지 판단하지 않습니다.</p>}
       </div>
-      {hint && (
-        <p className="mb-2 pl-7 text-xs leading-relaxed text-navy-500">{hint}</p>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="file"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="min-w-0 flex-1 text-xs text-navy-500 file:mr-2 file:rounded-md file:border-0 file:bg-navy-100 file:px-2 file:py-1.5 file:text-navy-700"
-        />
-        <button
-          type="button"
-          onClick={handleUpload}
-          disabled={!file || status === "uploading"}
-          className="rounded-md bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-800 disabled:opacity-40"
-        >
-          {status === "uploading" ? "업로드 중…" : "업로드"}
-        </button>
-      </div>
-      {status === "error" && (
-        <p className="mt-1.5 text-xs text-red-600">{msg}</p>
-      )}
+      <AttachmentList files={files} docKey={docKey} deleteAction={(data) => deleteDocByToken(token, docKey, String(data.get("attachment_id")))} restoreAction={(data) => restoreDocByToken(token, docKey, String(data.get("attachment_id")))} />
+      <MultiDocUpload label={label} signAction={(filename, metadata) => createDocUploadUrl(token, docKey, filename, metadata)} recordAction={(path, id) => recordDocUpload(token, docKey, category, path, id)} />
     </li>
   );
 }

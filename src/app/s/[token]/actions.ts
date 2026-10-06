@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { beginDocumentUpload, finishDocumentUpload, setDocumentRemoved, validShareTokenExpiry } from "@/lib/documents/server";
+import type { UploadMetadata, UploadResult, DocumentResult } from "@/lib/documents/types";
 
 // ── 폼 파서 ─────────────────────────────────────
 const str = (fd: FormData, k: string) => {
@@ -13,14 +15,16 @@ async function customerByToken(token: string) {
   const db = createAdminClient();
   const { data } = await db
     .from("customers")
-    .select("id")
+    .select("*")
     .eq("share_token", token)
     .single();
-  return data as { id: string } | null;
+  return data && validShareTokenExpiry(data.share_token_expires_at) ? data as { id: string } : null;
 }
 
 // ── 기본 정보 저장 (영업자) ──────────────────────
 export async function savePublicInfo(token: string, formData: FormData) {
+  const customer = await customerByToken(token);
+  if (!customer) throw new Error("유효하지 않거나 만료된 링크입니다.");
   const db = createAdminClient();
 
   const patch = {
@@ -35,60 +39,25 @@ export async function savePublicInfo(token: string, formData: FormData) {
   const { error } = await db
     .from("customers")
     .update(patch)
-    .eq("share_token", token);
+    .eq("id", customer.id);
   if (error) throw new Error(error.message);
   revalidatePath(`/s/${token}`);
 }
 
-// ── 서명 업로드 URL 발급 (브라우저 직접 업로드용) ──
-// 대용량 파일이 서버(Vercel 4.5MB 본문 제한)를 거치지 않도록,
-// 클라이언트가 Supabase Storage로 직접 올릴 수 있는 서명 URL을 발급.
-export async function createDocUploadUrl(
-  token: string,
-  doc_key: string,
-  filename: string,
-): Promise<{ path: string; token: string } | { error: string }> {
+// Browser bytes go directly to private Storage; finalization verifies size,
+// MIME/signature and the exact pending ID. Token access is rechecked each time.
+export async function createDocUploadUrl(token: string, docKey: string, filename: string, metadata?: UploadMetadata): Promise<UploadResult> {
   const customer = await customerByToken(token);
-  if (!customer) return { error: "유효하지 않은 링크입니다." };
-
-  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
-  const path = `${customer.id}/${doc_key}-${Date.now()}.${ext}`;
-
-  const db = createAdminClient();
-  const { data, error } = await db.storage
-    .from("customer-docs")
-    .createSignedUploadUrl(path);
-  if (error || !data) return { error: error?.message ?? "URL 발급 실패" };
-
-  return { path: data.path, token: data.token };
+  if (!customer) return { error: "유효하지 않거나 만료된 링크입니다." };
+  return beginDocumentUpload(createAdminClient(), customer.id, docKey, filename, metadata, "public");
 }
 
-// ── 업로드 완료 후 DB 기록 ───────────────────────
-export async function recordDocUpload(
-  token: string,
-  doc_key: string,
-  category: string,
-  path: string,
-): Promise<{ ok: true } | { error: string }> {
+export async function recordDocUpload(token: string, docKey: string, category: string, path: string, attachmentId?: string): Promise<DocumentResult> {
   const customer = await customerByToken(token);
-  if (!customer) return { error: "유효하지 않은 링크입니다." };
-
-  const db = createAdminClient();
-  const { error } = await db.from("customer_documents").upsert(
-    {
-      customer_id: customer.id,
-      doc_key,
-      category,
-      checked: true,
-      file_path: path,
-      uploaded_at: new Date().toISOString(),
-    },
-    { onConflict: "customer_id,doc_key" },
-  );
-  if (error) return { error: error.message };
-
-  revalidatePath(`/s/${token}`);
-  return { ok: true };
+  if (!customer) return { error: "유효하지 않거나 만료된 링크입니다." };
+  const result = await finishDocumentUpload(createAdminClient(), customer.id, docKey, category, path, attachmentId, "public");
+  if ("ok" in result) revalidatePath(`/s/${token}`);
+  return result;
 }
 
 // ── 기기 단위 등록 (영업자 · 여러 기계를 한 번에) ────
@@ -180,6 +149,9 @@ export async function recordDevicePhoto(
   const customer = await customerByToken(token);
   if (!customer) return { error: "유효하지 않은 링크입니다." };
   const db = createAdminClient();
+  if (!/^[0-9a-f-]{36}$/i.test(device_id) || !path.startsWith(`${customer.id}/device_photo_${device_id}_`) || path.split("/").length !== 2) {
+    return { error: "이 기기의 사진 업로드 경로가 아닙니다." };
+  }
   const doc_key = `device_photo_${device_id}_${Date.now()}_${Math.random()
     .toString(36)
     .slice(2, 7)}`;
@@ -201,6 +173,7 @@ export async function deleteDevicePhoto(
   token: string,
   doc_key: string,
 ): Promise<{ ok: true } | { error: string }> {
+  if (!doc_key.startsWith("device_photo_")) return { error: "기기 사진만 삭제할 수 있습니다." };
   const customer = await customerByToken(token);
   if (!customer) return { error: "유효하지 않은 링크입니다." };
   const db = createAdminClient();
@@ -209,8 +182,10 @@ export async function deleteDevicePhoto(
     .select("file_path")
     .eq("customer_id", customer.id)
     .eq("doc_key", doc_key)
+    .not("device_id", "is", null)
     .maybeSingle();
-  if (row?.file_path) {
+  if (!row) return { error: "기기 사진을 찾을 수 없습니다." };
+  if (row.file_path) {
     await db.storage.from("customer-docs").remove([row.file_path]);
   }
   const { error } = await db
@@ -223,33 +198,19 @@ export async function deleteDevicePhoto(
   return { ok: true };
 }
 
-// ── 서류 파일 삭제 (영업자) ──────────────────────
-export async function deleteDocByToken(
-  token: string,
-  doc_key: string,
-): Promise<{ ok: true } | { error: string }> {
+// Checklist attachment removal is reversible and scoped to one exact ID.
+export async function deleteDocByToken(token: string, docKey: string, attachmentId: string): Promise<DocumentResult> {
   const customer = await customerByToken(token);
-  if (!customer) return { error: "유효하지 않은 링크입니다." };
+  if (!customer) return { error: "유효하지 않거나 만료된 링크입니다." };
+  const result = await setDocumentRemoved(createAdminClient(), customer.id, docKey, attachmentId, true, "public");
+  if ("ok" in result) revalidatePath(`/s/${token}`);
+  return result;
+}
 
-  const db = createAdminClient();
-  const { data: row } = await db
-    .from("customer_documents")
-    .select("file_path")
-    .eq("customer_id", customer.id)
-    .eq("doc_key", doc_key)
-    .maybeSingle();
-
-  if (row?.file_path) {
-    await db.storage.from("customer-docs").remove([row.file_path]);
-  }
-
-  const { error } = await db
-    .from("customer_documents")
-    .delete()
-    .eq("customer_id", customer.id)
-    .eq("doc_key", doc_key);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/s/${token}`);
-  return { ok: true };
+export async function restoreDocByToken(token: string, docKey: string, attachmentId: string): Promise<DocumentResult> {
+  const customer = await customerByToken(token);
+  if (!customer) return { error: "유효하지 않거나 만료된 링크입니다." };
+  const result = await setDocumentRemoved(createAdminClient(), customer.id, docKey, attachmentId, false, "public");
+  if ("ok" in result) revalidatePath(`/s/${token}`);
+  return result;
 }
