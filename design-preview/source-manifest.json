@@ -1,0 +1,35 @@
+{
+  "version": "1.1.0-rc.1",
+  "source_commit": "9f18fa6ffc12f1b7c8e1ee03e501f0f21a99d283",
+  "exact_presentation_files": {
+    "ui/Button.tsx": {
+      "source_path": "src/components/Button.tsx",
+      "sha256": "2254c6876ad56a9458f48c63cd41291bc8720315ec0186bbbe1eff9b480e7dbb"
+    },
+    "ui/Field.tsx": {
+      "source_path": "src/components/ui/Field.tsx",
+      "sha256": "61ac755d1bbcff1a0251f9c74a2a16b81b0e279c94bfde6b5dd1800a904b2b64"
+    },
+    "ui/Feedback.tsx": {
+      "source_path": "src/components/ui/Feedback.tsx",
+      "sha256": "a3d6e3d0625ffb614f240cb37864b779bd5c6ab32577b61644905eb56f130699"
+    },
+    "ui/cn.ts": {
+      "source_path": "src/lib/cn.ts",
+      "sha256": "66ce082b8f7d70f89335eb6f9de86ebf1adfb8715f244845db88d10f98cada06"
+    },
+    "styles/tokens.json": {
+      "source_path": "design-system/tokens.json",
+      "sha256": "566f0358059da1e1a3269247652e17d83e18e2eac9528c78260290d364eb594c"
+    },
+    "styles/tokens.css": {
+      "source_path": "design-system/tokens.css",
+      "sha256": "a045ee7dd6d0a22ec16f107b38097afc3bd37c57abe066ba1044836baf1aeede"
+    },
+    "styles/components.css": {
+      "source_path": "design-system/components.css",
+      "sha256": "3953e6c67d6f781ef2ed0d2ef988e493d49a541b3d77bb8ee07bf4567e1d1f43"
+    }
+  },
+  "rest": "New presentation-only examples with explicit fictional constants. Not the full application or workflow implementation."
+}
