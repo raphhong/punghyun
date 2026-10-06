@@ -13,8 +13,7 @@ export function Footer() {
             <span className="text-lg font-bold text-white">주식회사 풍현</span>
           </div>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-navy-300">
-            사업자의 자금 흐름을 풍요롭게. 자산 기반 렌탈·선정산 서비스로 필요한
-            자금을 빠르고 투명하게 지원합니다.
+            보유 자산의 매입과 렌탈을 연결해 사업자의 운영자금 마련을 돕습니다.
           </p>
         </div>
 
@@ -35,7 +34,7 @@ export function Footer() {
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-white">문의</h3>
+          <h3 className="text-sm font-semibold text-white">상담 문의</h3>
           <ul className="mt-4 space-y-3 text-sm text-navy-300">
             <li>
               전화{" "}
@@ -65,8 +64,7 @@ export function Footer() {
         <Container className="flex flex-col items-start justify-between gap-2 py-6 text-xs text-navy-400 sm:flex-row sm:items-center">
           <p>© {new Date().getFullYear()} 주식회사 풍현. All rights reserved.</p>
           <p>
-            본 사이트의 내용은 상품 안내를 위한 것이며, 실제 계약 조건은 상담 시
-            안내됩니다.
+            이 사이트는 서비스 안내를 위한 것입니다. 실제 계약 조건은 상담 시 안내합니다.
           </p>
         </Container>
       </div>

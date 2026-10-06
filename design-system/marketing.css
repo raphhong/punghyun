@@ -1,0 +1,167 @@
+/* Public-site composition: the original P identity, an asset-flow diagram,
+   and a deliberate reading order. No decorative motion or stock dashboard UI. */
+/* These scoped overrides must win over utility classes on shared components. */
+@layer theme, base, components, utilities, ph-marketing;
+@layer ph-marketing {
+  .ph-public-header { background:#fff; }
+  .ph-public-header .ph-header-inner { height:80px; }
+  .ph-header-descriptor { border-left:1px solid #d8dfe7; padding-left:18px; margin-left:18px; font-size:12px; color:#627084; }
+  .ph-public-header .ph-header-link { padding:12px 16px; font-size:14px; color:#41516a; border-bottom:2px solid transparent; }
+  .ph-public-header .ph-header-link:hover { color:#03265A; }
+  .ph-public-header .ph-header-link[aria-current="page"] { color:#03265A; border-bottom-color:#03265A; }
+  .ph-public-header .ph-button { border-radius:4px; background:#03265A; border-color:#03265A; }
+  .ph-home { color:#172b45; }
+  .ph-home :is(h1,h2,h3,p,dt,dd) { word-break:keep-all; overflow-wrap:break-word; }
+  .ph-home .ph-button { border-radius:4px; }
+  .ph-home .ph-button--primary { background:#03265A; border-color:#03265A; }
+  .ph-home .ph-button--primary:hover,.ph-public-header .ph-button:hover { background:#173f72; border-color:#173f72; }
+  .ph-home-hero { background:#fff; padding-top:64px; }
+  .ph-hero-layout { display:grid; grid-template-columns:1.16fr 1fr; gap:52px; align-items:center; padding-bottom:60px; }
+  .ph-eyebrow { color:#385a80; font-size:12px; font-weight:650; letter-spacing:.04em; line-height:1.6; }
+  .ph-hero-copy > .ph-eyebrow { display:flex; align-items:center; gap:10px; }
+  .ph-hero-copy > .ph-eyebrow::before { content:""; height:2px; width:24px; background:#03265A; }
+  .ph-home h1 { margin-top:24px; color:#03265A; font-size:clamp(36px,4.35vw,57px); line-height:1.2; letter-spacing:-.055em; font-weight:700; }
+  .ph-home h1 span { color:#1c3653; }
+  .ph-hero-description { margin-top:26px; font-size:16px; line-height:1.85; color:#526176; }
+  .ph-hero-actions { display:flex; align-items:center; gap:26px; flex-wrap:wrap; margin-top:34px; }
+  .ph-home .ph-button--large { min-height:50px; font-size:14px; padding-inline:20px; }
+  .ph-text-link { display:inline-flex; align-items:center; gap:12px; min-height:44px; color:#03265A; font-size:14px; font-weight:600; text-underline-offset:5px; }
+  .ph-text-link:hover { text-decoration:underline; }
+  .ph-hero-disclaimer { margin-top:21px; color:#6a7788; font-size:12px; line-height:1.7; }
+  .ph-asset-diagram { background:#03265A; color:#fff; padding:26px 28px 24px; }
+  .ph-asset-diagram figcaption { display:flex; justify-content:space-between; align-items:center; gap:12px; border-bottom:1px solid #456188; padding-bottom:16px; font-size:12px; }
+  .ph-asset-drawing { padding-block:18px 22px; text-align:center; color:#c6d5ea; }
+  .ph-asset-drawing svg { width:100%; height:auto; }
+  .ph-asset-drawing > span { display:block; margin-top:4px; font-size:12px; letter-spacing:.02em; }
+  .ph-asset-exchange { display:grid; grid-template-columns:1fr 1.65fr 1fr; align-items:center; gap:15px; border-top:1px solid #456188; padding-top:20px; }
+  .ph-exchange-party { display:flex; flex-direction:column; gap:5px; }
+  .ph-exchange-party:last-child { text-align:right; }
+  .ph-exchange-party > span { font-size:12px; color:#c3d1e5; }
+  .ph-exchange-party strong { font-size:21px; letter-spacing:-.03em; font-weight:650; }
+  .ph-exchange-arrows { display:flex; flex-direction:column; gap:9px; font-size:12px; color:#d3deed; }
+  .ph-exchange-arrows > span { display:flex; align-items:center; justify-content:space-between; gap:8px; border-bottom:1px solid #647fa4; padding-bottom:4px; white-space:nowrap; }
+  .ph-exchange-arrows b { font-size:17px; font-weight:400; line-height:1; }
+  .ph-continuity-note { margin-top:18px; padding-top:13px; border-top:1px solid #456188; font-size:12px; color:#d3deed; }
+  .ph-continuity-note > span { margin-right:8px; font-size:16px; }
+  .ph-service-at-a-glance { border-top:1px solid #d5dee8; border-bottom:1px solid #d5dee8; display:grid; grid-template-columns:repeat(3,1fr); padding-block:24px; }
+  .ph-service-at-a-glance > div { padding-left:28px; border-left:1px solid #d5dee8; }
+  .ph-service-at-a-glance > div:first-child { padding-left:0; border-left:0; }
+  .ph-service-at-a-glance dt { font-size:12px; color:#627084; margin-bottom:5px; }
+  .ph-service-at-a-glance dd { font-size:15px; font-weight:600; }
+  .ph-home-section { padding-block:100px; }
+  .ph-home h2 { font-size:34px; font-weight:650; line-height:1.35; letter-spacing:-.045em; color:#142e4b; }
+  .ph-section-intro h2 { margin-top:17px; }
+  .ph-section-intro > p:not(.ph-eyebrow) { color:#526176; font-size:15px; line-height:1.85; max-width:330px; margin-top:22px; }
+  .ph-section-intro .ph-text-link { margin-top:20px; }
+  .ph-service-layout { display:grid; grid-template-columns:.94fr 1.15fr; gap:80px; }
+  .ph-service-timeline { list-style:none; }
+  .ph-service-timeline li { padding-block:26px; border-bottom:1px solid #d5dee8; }
+  .ph-service-timeline li:first-child { padding-top:0; }
+  .ph-service-timeline h3 { color:#03265A; font-size:20px; font-weight:650; letter-spacing:-.03em; }
+  .ph-service-timeline p { color:#526176; font-size:14px; line-height:1.8; margin-top:10px; }
+  .ph-contract-section { padding-block:62px; background:#eef2f6; }
+  .ph-contract-heading { display:flex; align-items:start; justify-content:space-between; gap:30px; padding-bottom:35px; }
+  .ph-contract-heading > .ph-eyebrow { padding-top:9px; }
+  .ph-contract-heading h2 { font-size:28px; }
+  .ph-contract-options { display:grid; grid-template-columns:1fr 1fr; border-top:1px solid #b7c5d5; }
+  .ph-contract-options > div { padding:30px 40px 0 0; }
+  .ph-contract-options > div + div { padding:30px 0 0 40px; border-left:1px solid #b7c5d5; }
+  .ph-contract-label { color:#4a6381; font-size:12px; font-weight:600; }
+  .ph-contract-options h3 { margin-top:13px; color:#03265A; font-size:26px; letter-spacing:-.04em; font-weight:650; }
+  .ph-contract-options p { margin-top:13px; color:#526176; font-size:14px; line-height:1.8; }
+  .ph-contract-end { display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-top:25px; font-size:12px; color:#627084; }
+  .ph-contract-end strong { font-size:13px; font-weight:600; color:#213e60; }
+  .ph-contract-footnote { margin-top:30px; font-size:12px; color:#627084; }
+  .ph-calculator-heading { display:flex; justify-content:space-between; gap:32px; align-items:end; margin-bottom:32px; }
+  .ph-calculator-heading h2 { margin-top:14px; font-size:30px; }
+  .ph-calculator-heading > p { color:#627084; font-size:13px; line-height:1.8; }
+  .ph-home-calculator { border-radius:0; box-shadow:none; border-color:#c6d2df; gap:0; padding:0; }
+  .ph-home-calculator > div:first-child { padding:30px; }
+  .ph-home-calculator .ph-calculator-result { border-radius:0; background:#f0f4f8; color:#03265A; padding:32px; }
+  .ph-home-calculator input { border-radius:4px; font-variant-numeric:tabular-nums; background:white; }
+  .ph-home-calculator :is(button,a) { border-radius:4px; }
+  .ph-home-calculator button { min-height:44px; }
+  .ph-home-calculator .ph-result-amount { overflow-wrap:anywhere; }
+  .ph-home-calculator .ph-result-label { color:#486484; font-size:12px; }
+  .ph-home-calculator .ph-result-amount { color:#03265A; font-variant-numeric:tabular-nums; font-size:32px; }
+  .ph-home-calculator .ph-result-breakdown { border-color:#c6d2df; }
+  .ph-home-calculator .ph-result-breakdown dt { color:#536983; }
+  .ph-home-calculator .ph-result-breakdown dd { color:#03265A; font-variant-numeric:tabular-nums; }
+  .ph-home-calculator .ph-result-empty-title { color:#324f70; font-size:23px; letter-spacing:-.025em; }
+  .ph-home-calculator .ph-result-empty-description { color:#63758b; max-width:250px; line-height:1.8; }
+  .ph-home-calculator .ph-result-disclaimer { color:#586c85; line-height:1.8; }
+  .ph-home-calculator .ph-result-contact { background:#03265A; }
+  .ph-home-contact { padding-block:66px; background:#03265A; }
+  .ph-contact-layout { display:flex; justify-content:space-between; align-items:center; gap:60px; }
+  .ph-home-contact .ph-eyebrow { color:#becfe5; }
+  .ph-home-contact h2 { color:#fff; margin-top:17px; font-size:32px; }
+  .ph-home-contact p:not(.ph-eyebrow) { margin-top:18px; font-size:13px; color:#becfe5; line-height:1.8; }
+  .ph-contact-actions { flex-shrink:0; min-width:230px; }
+  .ph-home-contact .ph-button { background:#fff; border-color:#fff; color:#03265A; display:flex; justify-content:space-between; width:100%; }
+  .ph-home-contact .ph-button:hover { background:#e7eef6; border-color:#e7eef6; }
+  .ph-contact-actions > a:not(.ph-button) { display:block; color:#fff; margin-top:21px; font-size:20px; font-variant-numeric:tabular-nums; letter-spacing:.015em; }
+  .ph-contact-actions > a:not(.ph-button) span { display:block; font-size:12px; color:#becfe5; margin-top:3px; letter-spacing:0; }
+  .ph-mobile-break { display:none; }
+  @media(max-width:1023px) {
+    .ph-header-descriptor { display:none; }
+    .ph-hero-layout { gap:30px; }
+    .ph-home h1 { font-size:clamp(32px,4.6vw,45px); }
+    .ph-hero-description { font-size:14px; }
+    .ph-hero-actions { gap:13px; }
+    .ph-hero-actions .ph-text-link { font-size:12px; }
+    .ph-asset-diagram { padding:22px; }
+    .ph-service-layout { gap:48px; }
+    .ph-home h2 { font-size:28px; }
+    .ph-service-at-a-glance dd { font-size:13px; }
+    .ph-desktop-break { display:none; }
+  }
+  @media(max-width:767px) {
+    .ph-public-header .ph-header-inner { height:64px; }
+    .ph-home-hero { padding-top:39px; }
+    .ph-hero-layout { grid-template-columns:1fr; gap:35px; padding-bottom:32px; }
+    .ph-home h1 { font-size:clamp(32px,9.5vw,40px); margin-top:20px; line-height:1.24; }
+    .ph-hero-description { margin-top:20px; max-width:370px; font-size:15px; }
+    .ph-hero-actions { margin-top:25px; gap:22px; }
+    .ph-hero-actions .ph-text-link { font-size:13px; }
+    .ph-hero-disclaimer { margin-top:15px; font-size:12px; }
+    .ph-asset-diagram { padding:20px 24px; }
+    .ph-asset-drawing { padding-block:10px 14px; }
+    .ph-asset-drawing svg { max-height:190px; }
+    .ph-asset-exchange { grid-template-columns:60px minmax(0,1fr)50px; gap:12px; padding-top:15px; }
+    .ph-service-at-a-glance { padding-block:18px; gap:12px; }
+    .ph-service-at-a-glance > div { padding-left:12px; }
+    .ph-service-at-a-glance dd { font-size:12px; line-height:1.6; }
+    .ph-service-at-a-glance dt { font-size:12px; }
+    .ph-home-section { padding-block:60px; }
+    .ph-service-layout { grid-template-columns:1fr; gap:32px; }
+    .ph-home h2 { font-size:29px; }
+    .ph-section-intro > p:not(.ph-eyebrow) { max-width:100%; margin-top:16px; font-size:14px; }
+    .ph-section-intro .ph-text-link { margin-top:12px; }
+    .ph-service-timeline li { padding-block:22px; }
+    .ph-service-timeline li:first-child { border-top:1px solid #d5dee8; padding-top:22px; }
+    .ph-service-timeline h3 { font-size:19px; }
+    .ph-contract-section { padding-block:42px; }
+    .ph-contract-heading { display:block; padding-bottom:26px; }
+    .ph-contract-heading h2 { margin-top:14px; font-size:26px; }
+    .ph-contract-options { grid-template-columns:1fr; }
+    .ph-contract-options > div { padding:25px 0; }
+    .ph-contract-options > div + div { padding:25px 0 0; border-left:0; border-top:1px solid #b7c5d5; }
+    .ph-contract-options h3 { font-size:25px; }
+    .ph-contract-end { margin-top:16px; }
+    .ph-contract-footnote { font-size:12px; }
+    .ph-calculator-heading { display:block; margin-bottom:24px; }
+    .ph-calculator-heading > p { margin-top:14px; }
+    .ph-calculator-heading h2 { font-size:28px; }
+    .ph-home-calculator { gap:0; }
+    .ph-home-calculator > div:first-child { padding:22px 20px; }
+    .ph-home-calculator .ph-calculator-result { padding:25px 20px; min-height:260px; }
+    .ph-home-calculator .ph-result-amount { font-size:clamp(24px,6.8vw,29px); overflow-wrap:anywhere; }
+    .ph-contact-layout { display:block; }
+    .ph-home-contact { padding-block:43px; }
+    .ph-home-contact h2 { font-size:28px; }
+    .ph-contact-actions { margin-top:30px; min-width:0; max-width:320px; }
+    .ph-contact-actions > a:not(.ph-button) { margin-top:18px; }
+    .ph-mobile-break { display:block; }
+  }
+  @media(max-width:359px) { .ph-home h1 { font-size:32px; } .ph-hero-actions { gap:12px; } .ph-asset-diagram { padding-inline:18px; } }
+}
