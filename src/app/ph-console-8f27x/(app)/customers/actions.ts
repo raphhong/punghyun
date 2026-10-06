@@ -90,7 +90,6 @@ export async function updatePipeline(
   const patch = {
     inspection_date: str(formData, "inspection_date"),
     execution_amount: num(formData, "execution_amount"),
-    rental_price: num(formData, "rental_price"),
     internal_review_done: bool(formData, "internal_review_done"),
 
     contract_sent: bool(formData, "contract_sent"),
@@ -100,9 +99,7 @@ export async function updatePipeline(
     funding_done: bool(formData, "funding_done"),
     funding_done_date: str(formData, "funding_done_date"),
 
-    // 회차별 렌탈료 입금 스케줄 (완납 판정 = paid_count >= rental_months)
-    first_payment_date: str(formData, "first_payment_date"),
-    rental_months: num(formData, "rental_months"),
+    // 렌탈 일정은 별도의 명시적 저장/감사 트랜잭션으로만 변경합니다.
 
     maturity_result: str(formData, "maturity_result"),
     acquisition_price: num(formData, "acquisition_price"),
@@ -123,15 +120,8 @@ export async function setPaidCount(
   id: string,
   count: number,
 ): Promise<{ ok: true } | { error: string }> {
-  const supabase = await createClient();
-  const c = Math.max(0, Math.floor(count));
-  const { error } = await supabase
-    .from("customers")
-    .update({ paid_count: c })
-    .eq("id", id);
-  if (error) return { error: error.message };
-  refresh(id);
-  return { ok: true };
+  void id; void count;
+  return { error: "완납 회차 직접 변경은 지원하지 않습니다. 실제 입금일·금액을 수납원장에 명시적으로 저장해 주세요." };
 }
 
 // ── 특정 단계로 직접 이동 (stepper 클라이언트 호출용) ─

@@ -1,5 +1,6 @@
-import { addMonths } from "./payments";
+import { addMonths, resolvePaymentSchedule, todayISO, validDate } from "./payments";
 import type { Customer } from "./types";
+export { validDate } from "./payments";
 
 // Read-only projection. paid_count is never evidence of a dated cash receipt.
 export type CashCustomer = Pick<Customer, "id" | "hospital_name" | "stage" | "first_payment_date" | "rental_months" | "rental_price" | "paid_count" | "execution_amount" | "funding_scheduled_date" | "funding_done" | "funding_done_date"> & {
@@ -24,12 +25,7 @@ const empty = (): Amount => ({ value: 0, known: 0, missing: 0 });
 const missing = (): Amount => ({ value: 0, known: 0, missing: 1 });
 const money = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
-export function validDate(v: unknown): v is string {
-  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
-  const d = new Date(v + "T00:00:00Z");
-  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === v;
-}
-export function koreaToday(now = new Date()): string { return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(now); }
+export function koreaToday(now = new Date()): string { return todayISO(now); }
 export function validMonth(v: unknown): v is string { return typeof v === "string" && /^(19|20|21)\d{2}-(0[1-9]|1[0-2])$/.test(v); }
 export function shiftMonth(month: string, offset: number) { return addMonths(month + "-01", offset).slice(0, 7); }
 export function amountText(a: Amount): string {
@@ -82,16 +78,15 @@ export function projectCashflow(customers: CashCustomer[], profiles: FundingProf
       else { flows[key].value += amount; flows[key].known++; }
       row.details.push({ label, date, amount: money(amount) ? amount : null });
     };
-    const months = c.rental_months;
-    if (!validDate(c.first_payment_date) || !Number.isInteger(months) || !months || months < 1 || months > 600) {
-      flows.rentalPlan = missing(); row.issues.push("렌탈 일정 기준(첫 납부일·총 회차) 미입력 또는 오류");
+    const schedule = resolvePaymentSchedule(c);
+    if (!schedule.ok) {
+      flows.rentalPlan = missing();
+      row.issues.push(schedule.error === "invalid_basis"
+        ? "렌탈 일정 기준(첫 납부일·총 회차) 미입력 또는 오류"
+        : "개별 납부 일정 오류: 기본 일정으로 대체하지 않음");
     } else {
-      const custom = c.payment_schedule;
-      const validCustom = custom == null || (Array.isArray(custom) && custom.every(r => object(r) && Number.isInteger(r.no) && Number(r.no) >= 1 && Number(r.no) <= months && validDate(r.dueDate) && (r.amount === null || money(r.amount))) && new Set(custom.map(r => r.no)).size === custom.length);
-      if (!validCustom) { flows.rentalPlan = missing(); row.issues.push("개별 납부 일정 오류: 기본 일정으로 대체하지 않음"); }
-      else for (let no = 1; no <= months; no++) {
-        const override = Array.isArray(custom) ? custom.find(r => r.no === no) : undefined;
-        add("rentalPlan", override ? override.dueDate : addMonths(c.first_payment_date, no - 1), override ? override.amount : c.rental_price, `렌탈 예정 ${no}회차`);
+      for (const installment of schedule.installments) {
+        add("rentalPlan", installment.dueDate, installment.amount, `렌탈 예정 ${installment.no}회차`);
       }
     }
     // Compatibility adapter for the independently maintained 2026-09-27 ledger.
