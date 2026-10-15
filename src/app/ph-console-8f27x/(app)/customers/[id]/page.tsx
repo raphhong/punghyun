@@ -397,15 +397,16 @@ ${docLines}
         <div className="mt-3 space-y-4">
           <CollapsibleCard
             title="① 계약 체결"
-            desc="매매·임대차 분리 · 잔존가치 근거"
+            desc="SRB 최종 표준계약 · 거래조건 · 자산목록"
             open={openContract}
           >
             <div className="mb-3 rounded-lg border border-brand-200 bg-white p-3">
               <p className="mb-2 text-xs text-brand-700/80">
-                고객 정보로 초안을 생성합니다. 새 탭에서 인쇄/PDF 저장 후 서명본을 아래에 업로드하세요.
+                5차 최종본 기반 전자날인용 계약서를 작성합니다. 필수 정보를 확인한 후 DOCX를 내려받아 글로싸인에 업로드하세요.
               </p>
               <div className="flex flex-wrap gap-2">
-                {CONTRACT_TYPES.map((ct) => (
+                <a href={adminPath(`contracts/${id}/srb`)} className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white">최종 표준계약 작성</a>
+                {CONTRACT_TYPES.filter(ct=>!ct.core).map((ct) => (
                   <a
                     key={ct.type}
                     href={adminPath(`contracts/${id}/${ct.type}`)}
