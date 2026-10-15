@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Customer } from "@/lib/admin/types";
 import { EditableContract } from "@/components/admin/EditableContract";
@@ -16,6 +16,7 @@ export default async function ContractPrintPage({
   params: Promise<{ id: string; type: string }>;
 }) {
   const { id, type } = await params;
+  if(type==='sale'||type==='rental')redirect(`/ph-console-8f27x/contracts/${id}/srb`);
   if (!isContractType(type)) notFound();
 
   const supabase = await createClient();
