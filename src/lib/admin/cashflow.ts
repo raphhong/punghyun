@@ -1,4 +1,4 @@
-import { addMonths } from "./payments";
+import { addMonths, plannedSchedule } from "./payments";
 import type { Customer } from "./types";
 
 // Read-only projection. paid_count is never evidence of a dated cash receipt.
@@ -55,7 +55,7 @@ export function cashflowCustomers(customers: CashCustomer[], movements: Movement
     const history = recorded.has(c.id) || Boolean(c.funding_done) || Boolean(c.funding_done_date) || receiptHistory;
     // Dates/amounts in an unexecuted proposal must not revive a cancelled contract.
     if (c.stage === "closed") return history || !movementsAvailable;
-    return recorded.has(c.id) || Boolean(c.funding_done) || ["contract", "funding", "operation", "maturity"].includes(c.stage) || Boolean(c.first_payment_date) || Boolean(c.funding_scheduled_date);
+    return recorded.has(c.id) || Boolean(c.funding_done) || ["contract", "funding", "operation", "maturity"].includes(c.stage) || Boolean(c.first_payment_date) || Boolean(c.funding_scheduled_date) || c.payment_schedule != null;
   });
 }
 
@@ -82,18 +82,10 @@ export function projectCashflow(customers: CashCustomer[], profiles: FundingProf
       else { flows[key].value += amount; flows[key].known++; }
       row.details.push({ label, date, amount: money(amount) ? amount : null });
     };
-    const months = c.rental_months;
-    if (!validDate(c.first_payment_date) || !Number.isInteger(months) || !months || months < 1 || months > 600) {
-      flows.rentalPlan = missing(); row.issues.push("렌탈 일정 기준(첫 납부일·총 회차) 미입력 또는 오류");
-    } else {
-      const custom = c.payment_schedule;
-      const validCustom = custom == null || (Array.isArray(custom) && custom.every(r => object(r) && Number.isInteger(r.no) && Number(r.no) >= 1 && Number(r.no) <= months && validDate(r.dueDate) && (r.amount === null || money(r.amount))) && new Set(custom.map(r => r.no)).size === custom.length);
-      if (!validCustom) { flows.rentalPlan = missing(); row.issues.push("개별 납부 일정 오류: 기본 일정으로 대체하지 않음"); }
-      else for (let no = 1; no <= months; no++) {
-        const override = Array.isArray(custom) ? custom.find(r => r.no === no) : undefined;
-        add("rentalPlan", override ? override.dueDate : addMonths(c.first_payment_date, no - 1), override ? override.amount : c.rental_price, `렌탈 예정 ${no}회차`);
-      }
-    }
+    const schedule = plannedSchedule(c);
+    if (schedule.error) { flows.rentalPlan = missing(); row.issues.push(schedule.error); }
+    else for (const installment of schedule.rows)
+      add("rentalPlan", installment.dueDate, installment.amount, `렌탈 예정 ${installment.no}회차`);
     // Compatibility adapter for the independently maintained 2026-09-27 ledger.
     // Do not install, populate, or modify that ledger here.
     const ledger = c.receipt_ledger;

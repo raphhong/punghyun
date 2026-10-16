@@ -12,6 +12,7 @@ import { StageStepper } from "@/components/admin/StageStepper";
 import { AutosaveForm } from "@/components/admin/AutosaveForm";
 import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { PaymentScheduleEditor } from "@/components/admin/PaymentScheduleEditor";
+import { RentalPlanEditor } from "@/components/admin/RentalPlanEditor";
 import { adminPath } from "@/lib/admin/config";
 import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
@@ -46,6 +47,7 @@ import {
   recordDevicePhoto,
   deleteDevicePhoto,
   setPaidCount,
+  savePaymentSchedule,
 } from "../actions";
 
 export const metadata = { title: "고객 상세" };
@@ -519,6 +521,7 @@ ${docLines}
           </div>
           <p className="mt-2 text-xs text-navy-400">
             첫 입금일과 총 회차를 저장하면 매월 같은 날짜로 회차별 예정일이 생성됩니다.
+              날짜·금액이 다른 계약은 아래 회차별 예정 입력에서 저장합니다.
             입금 예정·연체는 대시보드 입금 인박스에서 확인합니다.
           </p>
         </CollapsibleCard>
@@ -572,9 +575,10 @@ ${docLines}
       {/* 회차별 렌탈료 납부 현황 — 자동저장 폼 밖(별도 액션) */}
       <CollapsibleCard
         title="회차별 렌탈료 납부 현황"
-        desc="회차를 눌러 입금 완료 처리합니다."
+          desc="회차별 예정 입력과 입금 완료 처리를 구분합니다."
         open={openOperation}
       >
+        <RentalPlanEditor key={customer.updated_at} id={id} updatedAt={customer.updated_at} schedule={customer} action={savePaymentSchedule} />
         <PaymentScheduleEditor
           id={id}
           schedule={{
@@ -582,6 +586,7 @@ ${docLines}
             rental_months: customer.rental_months,
             paid_count: customer.paid_count,
             rental_price: customer.rental_price,
+              payment_schedule: customer.payment_schedule,
           }}
           action={setPaidCount}
         />

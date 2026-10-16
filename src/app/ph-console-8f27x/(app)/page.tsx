@@ -25,13 +25,10 @@ export default async function DashboardPage() {
   });
   const total = rows?.length ?? 0;
 
-  // 렌탈료 입금 인박스 — 첫 입금일이 설정된 건의 다음 미납 회차 중 연체·임박만.
-  const { data: schedRows } = await supabase
+  // Include explicit schedules even when monthly default fields are blank.
+  const { data: schedRows, error: scheduleError } = await supabase
     .from("customers")
-    .select(
-      "id, hospital_name, first_payment_date, rental_months, paid_count, rental_price",
-    )
-    .not("first_payment_date", "is", null);
+    .select("*"); // Compatible with projects where the optional schedule column is not yet installed.
 
   const today = todayISO();
   const inbox: PendingRow[] = [];
@@ -42,6 +39,7 @@ export default async function DashboardPage() {
         rental_months: c.rental_months ?? null,
         paid_count: c.paid_count ?? 0,
         rental_price: c.rental_price ?? null,
+        payment_schedule: c.payment_schedule,
       },
       today,
     );
@@ -92,6 +90,7 @@ export default async function DashboardPage() {
         <span className="mt-1 block text-sm">누적 집행액 · 렌탈료 수납 · 채권사 지급 · 유동화 유입</span>
       </Link>}
       <PaymentInbox items={inbox} action={setPaidCount} />
+      {scheduleError && <p role="alert">렌탈 예정을 읽지 못했습니다. 조회 권한과 연결을 확인해 주세요.</p>}
 
       {/* 단계별 카드 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
