@@ -40,6 +40,7 @@ export type Customer = {
   first_payment_date: string | null;
   rental_months: number | null;
   paid_count: number;
+  payment_schedule?: unknown;
 
   // 영업 수수료 — 건별 수수료율 override(%)와 누적 지급액(원)
   commission_rate: number | null;

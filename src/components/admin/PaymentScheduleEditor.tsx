@@ -6,6 +6,7 @@ import {
   buildSchedule,
   dueLabel,
   fmtWon,
+  plannedSchedule,
   type Installment,
   type ScheduleInput,
 } from "@/lib/admin/payments";
@@ -48,7 +49,7 @@ export function PaymentScheduleEditor({
   if (rows.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-navy-200 bg-navy-50/50 px-3 py-4 text-center text-sm text-navy-400">
-        먼저 첫 입금일과 총 회차를 입력하면 회차별 예정일이 표시됩니다.
+        {plannedSchedule(schedule).error ?? "회차별 렌탈 예정을 입력해 주세요."}
       </p>
     );
   }
@@ -60,6 +61,7 @@ export function PaymentScheduleEditor({
   function setPaid(n: number) {
     // 이미 납부된 마지막 회차를 누르면 그 직전까지 되돌리고, 아니면 그 회차까지 완납.
     const target = n <= paidCount ? n - 1 : n;
+    if (!window.confirm(target > paidCount ? `${target}회차까지 실제 입금을 확인했습니까? 예정 등록은 위의 '렌탈 예정만 저장'을 이용해 주세요.` : "납부 상태를 되돌리겠습니까?")) return;
     startTransition(async () => {
       const res = await action(id, target);
       if ("error" in res) {

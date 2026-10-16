@@ -22,7 +22,43 @@ export type ScheduleInput = {
   rental_months: number | null;
   paid_count: number | null;
   rental_price: number | null;
+  payment_schedule?: unknown;
 };
+
+export type PlannedInstallment = { no: number; dueDate: string; amount: number | null };
+
+export function validPaymentDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + "T00:00:00Z");
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function validPlannedRows(value: unknown): value is PlannedInstallment[] {
+  return Array.isArray(value) && value.length <= 600 && value.every(r =>
+    r && typeof r === "object" && Number.isInteger(r.no) && r.no >= 1 && r.no <= 600 &&
+    validPaymentDate(r.dueDate) && (r.amount === null || (Number.isSafeInteger(r.amount) && r.amount >= 0))
+  ) && new Set(value.map(r => r.no)).size === value.length;
+}
+
+// A complete custom schedule works without monthly defaults. Legacy partial
+// overrides still use those defaults; invalid data never silently falls back.
+export function plannedSchedule(c: ScheduleInput): { rows: PlannedInstallment[]; error?: string } {
+  const custom = c.payment_schedule;
+  if (custom != null && !validPlannedRows(custom)) return { rows: [], error: "개별 납부 일정 오류: 기본 일정으로 대체하지 않음" };
+  const overrides = (custom ?? []) as PlannedInstallment[];
+  const months = c.rental_months;
+  const total = months ?? overrides.length;
+  if (!Number.isInteger(total) || total < 1 || total > 600 || overrides.some(r => r.no > total))
+    return { rows: [], error: "렌탈 일정 기준(총 회차) 미입력 또는 오류" };
+  const rows: PlannedInstallment[] = [];
+  for (let no = 1; no <= total; no++) {
+    const override = overrides.find(r => r.no === no);
+    if (override) rows.push({ ...override });
+    else if (validPaymentDate(c.first_payment_date)) rows.push({ no, dueDate: addMonths(c.first_payment_date, no - 1), amount: c.rental_price });
+    else return { rows: [], error: "렌탈 일정 기준(첫 납부일·총 회차) 미입력 또는 오류" };
+  }
+  return { rows };
+}
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -67,39 +103,13 @@ export function buildSchedule(
   c: ScheduleInput,
   today = todayISO(),
 ): Installment[] {
-  if (!c.first_payment_date || !c.rental_months || c.rental_months <= 0)
-    return [];
-  const total = Math.min(c.rental_months, 600);
   const paidCount = c.paid_count ?? 0;
-  const out: Installment[] = [];
-  for (let n = 1; n <= total; n++) {
-    const dueDate = addMonths(c.first_payment_date, n - 1);
-    const paid = n <= paidCount;
-    out.push({
-      no: n,
-      dueDate,
-      amount: c.rental_price ?? null,
-      paid,
-      status: statusFor(dueDate, paid, today),
-    });
-  }
-  return out;
+  return plannedSchedule(c).rows.map(row => ({ ...row, paid: row.no <= paidCount, status: statusFor(row.dueDate, row.no <= paidCount, today) }));
 }
 
 // 다음 미납 회차 1건(없으면 null) — 대시보드 인박스·상세 요약 공용.
 export function nextDue(c: ScheduleInput, today = todayISO()): Installment | null {
-  if (!c.first_payment_date || !c.rental_months || c.rental_months <= 0)
-    return null;
-  const n = (c.paid_count ?? 0) + 1;
-  if (n > c.rental_months) return null;
-  const dueDate = addMonths(c.first_payment_date, n - 1);
-  return {
-    no: n,
-    dueDate,
-    amount: c.rental_price ?? null,
-    paid: false,
-    status: statusFor(dueDate, false, today),
-  };
+  return buildSchedule(c, today).find(row => !row.paid) ?? null;
 }
 
 export function fmtWon(n: number | null | undefined): string {

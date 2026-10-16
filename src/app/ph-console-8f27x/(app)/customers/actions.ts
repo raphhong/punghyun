@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { adminPath } from "@/lib/admin/config";
 import { nextStage, prevStage, type StageKey } from "@/lib/admin/pipeline";
 import type { CustomerSource } from "@/lib/admin/types";
+import { plannedSchedule, validPlannedRows } from "@/lib/admin/payments";
 
 // ── 폼 파서 헬퍼 ────────────────────────────────
 const str = (fd: FormData, k: string) => {
@@ -23,7 +24,38 @@ const bool = (fd: FormData, k: string) => fd.get(k) != null;
 function refresh(id?: string) {
   revalidatePath(adminPath("customers"));
   revalidatePath(adminPath());
+  revalidatePath(adminPath("cashflow"));
   if (id) revalidatePath(adminPath(`customers/${id}`));
+}
+
+// Store one schedule on the existing contract/customer row. Never append another
+// contract or write receipt fields. updated_at prevents overwriting concurrent edits.
+export async function savePaymentSchedule(id: string, expectedUpdatedAt: string, input: unknown): Promise<{ ok: true } | { error: string }> {
+  if (!validPlannedRows(input) || !input.length || input.some((r, i) => r.no !== i + 1 || r.amount === null))
+    return { error: "1회차부터 순서대로 날짜와 원 단위 금액을 입력해 주세요. 중복 회차는 저장할 수 없습니다." };
+  if (!expectedUpdatedAt) return { error: "페이지를 새로고침한 뒤 다시 저장해 주세요." };
+  const supabase = await createClient();
+  const claims = await supabase.auth.getClaims();
+  const uid = claims.data?.claims?.sub;
+  if (!uid) return { error: "관리자 로그인이 필요합니다." };
+  const access = await supabase.from("admins").select("user_id").eq("user_id", uid).maybeSingle();
+  if (access.error || !access.data) return { error: "관리자 권한을 확인할 수 없습니다." };
+  const current = await supabase.from("customers").select("*").eq("id", id).maybeSingle();
+  if (current.error || !current.data) return { error: "고객 정보를 읽을 수 없습니다." };
+  const c = current.data;
+  if (c.updated_at !== expectedUpdatedAt) return { error: "다른 변경이 저장되었습니다. 새로고침 후 확인해 주세요." };
+  if (c.rental_months != null && c.rental_months !== input.length) return { error: "총 렌탈 회차와 입력한 일정 수가 다릅니다. 기존 회차를 확인해 주세요." };
+  const previous = plannedSchedule(c);
+  if (input.length < (c.paid_count ?? 0) || (c.paid_count > 0 && previous.error) || previous.rows.some(r => r.no <= c.paid_count && (input[r.no - 1]?.dueDate !== r.dueDate || input[r.no - 1]?.amount !== r.amount)))
+    return { error: "납부 처리된 회차의 예정 내역은 여기서 변경할 수 없습니다." };
+  const payment_schedule = input.map(({ no, dueDate, amount }) => ({ no, dueDate, amount }));
+  const { data, error } = await supabase.from("customers")
+    .update({ payment_schedule, ...(c.rental_months == null ? { rental_months: input.length } : {}) })
+    .eq("id", id).eq("updated_at", expectedUpdatedAt).select("id").maybeSingle();
+  if (error) return { error: "예정을 저장하지 못했습니다. 일정 컬럼과 기존 DB 권한을 확인해 주세요." };
+  if (!data) return { error: "다른 변경이 저장되었습니다. 새로고침 후 확인해 주세요." };
+  refresh(id);
+  return { ok: true };
 }
 
 // ── 신규 고객 추가 (인입 단계) ───────────────────
