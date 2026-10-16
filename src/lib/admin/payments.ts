@@ -62,10 +62,9 @@ export function plannedSchedule(c: ScheduleInput): { rows: PlannedInstallment[];
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-// 로컬 기준 오늘 날짜(YYYY-MM-DD).
-export function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// 서버와 브라우저의 시간대에 관계없이 한국 기준 오늘 날짜(YYYY-MM-DD).
+export function todayISO(now = new Date()): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(now);
 }
 
 // iso 날짜에 m개월 더하기 — 같은 '일'을 유지하되 월말은 해당 월 마지막 날로 보정.
