@@ -1,4 +1,4 @@
-import { addMonths, plannedSchedule } from "./payments";
+import { addMonths, plannedSchedule, todayISO } from "./payments";
 import type { Customer } from "./types";
 
 // Read-only projection. paid_count is never evidence of a dated cash receipt.
@@ -29,7 +29,7 @@ export function validDate(v: unknown): v is string {
   const d = new Date(v + "T00:00:00Z");
   return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === v;
 }
-export function koreaToday(now = new Date()): string { return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(now); }
+export function koreaToday(now = new Date()): string { return todayISO(now); }
 export function validMonth(v: unknown): v is string { return typeof v === "string" && /^(19|20|21)\d{2}-(0[1-9]|1[0-2])$/.test(v); }
 export function shiftMonth(month: string, offset: number) { return addMonths(month + "-01", offset).slice(0, 7); }
 export function amountText(a: Amount): string {
