@@ -13,6 +13,7 @@ import { AutosaveForm } from "@/components/admin/AutosaveForm";
 import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { PaymentScheduleEditor } from "@/components/admin/PaymentScheduleEditor";
 import { RentalPlanEditor } from "@/components/admin/RentalPlanEditor";
+import { ActualFundingPanel } from "@/components/admin/ActualFundingPanel";
 import { adminPath } from "@/lib/admin/config";
 import { CONTRACT_TYPES } from "@/lib/admin/contracts";
 import {
@@ -591,6 +592,8 @@ ${docLines}
           action={setPaidCount}
         />
       </CollapsibleCard>
+
+      <ActualFundingPanel id={id} />
 
       {/* 위험 구역 */}
       <CollapsibleCard title="고객 삭제" desc="이 작업은 되돌릴 수 없습니다.">
