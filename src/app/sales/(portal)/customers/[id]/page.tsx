@@ -14,6 +14,11 @@ import {
 import type { Customer, CustomerDocument } from "@/lib/admin/types";
 import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
+import { getSessionAgent } from "@/lib/sales/agent";
+import { OtherDocumentUpload } from "@/components/admin/OtherDocumentUpload";
+import { isOtherDocument } from "@/lib/admin/other-documents";
+import { otherDocumentFilename } from "@/lib/admin/other-document-path";
+import { salesCreateOtherDocumentUpload, salesRecordOtherDocumentUpload } from "@/app/sales/other-document-actions";
 import { SalesDocUpload } from "@/components/sales/SalesDocUpload";
 import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
 import {
@@ -39,6 +44,7 @@ export default async function SalesCustomerDetail({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const { agent } = await getSessionAgent();
 
   // RLS: 내 서브트리 고객만 조회 가능
   const [customerRes, docsRes, devicesRes] = await Promise.all([
@@ -211,6 +217,27 @@ ${docLines}
           signedMap={signedMap}
           customerId={customer.id}
         />
+        <section className="mt-4 space-y-3 border-t border-navy-200 pt-4" aria-label="기타 서류 (선택)">
+          <h3 className="text-sm font-semibold text-navy-800">기타 서류 (선택)</h3>
+          <p className="text-xs text-navy-500">필요한 경우에만 첨부하세요. 필수 제출·서류 충족률·다음 단계 진행 조건에 포함되지 않습니다.</p>
+          {agent?.status === "approved" && customer.sales_agent_id === agent.id ? (
+            <OtherDocumentUpload customerId={customer.id} actions={{
+              createUpload: salesCreateOtherDocumentUpload,
+              recordUpload: salesRecordOtherDocumentUpload,
+            }} />
+          ) : <p className="text-xs text-navy-500">첨부는 본인 담당 고객에게만 가능합니다.</p>}
+          <ul className="space-y-2">
+            {docs.filter(row => isOtherDocument(row.doc_key) && row.file_path).map(row => {
+              const url = signedMap.get(row.file_path!);
+              return <li key={row.doc_key} className="flex flex-wrap items-center gap-3 text-sm">
+                <span>{otherDocumentFilename(row.file_path!)}</span>
+                {url && <><a href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600">보기</a>
+                  <a href={url + "&download"} className="text-navy-500">다운로드</a></>}
+              </li>;
+            })}
+          </ul>
+          {!docs.some(row => isOtherDocument(row.doc_key) && row.file_path) && <p className="text-xs text-navy-400">업로드된 기타 서류가 없습니다.</p>}
+        </section>
       </Card>
       <Card title="3차 스크리닝 서류" desc="판매할 기기 · 정보 수집">
         <div className="mb-5">

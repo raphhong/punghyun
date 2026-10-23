@@ -13,7 +13,7 @@ export const OTHER_DOCUMENT_TYPES: Record<string, string[]> = {
   zip: ["application/zip", "application/x-zip-compressed"],
 };
 export const OTHER_DOCUMENT_ACCEPT = Object.keys(OTHER_DOCUMENT_TYPES).map(ext => `.${ext}`).join(",");
-export const OTHER_DOCUMENT_HINT = "PDF, 이미지(JPG·PNG·GIF·WebP·BMP·HEIC·HEIF), Word(DOC·DOCX), Excel(XLS·XLSX), ZIP · 파일당 최대 20MB. 저장소 제한이 더 낮으면 해당 제한이 적용됩니다.";
+export const OTHER_DOCUMENT_HINT = "PDF, 이미지(JPG·PNG·GIF·WebP·BMP·HEIC·HEIF), Word(DOC·DOCX), Excel(XLS·XLSX), ZIP · 파일당 최대 20MB.";
 
 export function validateOtherDocument(name: string, size: number, mime: string): string | null {
   if (!name || name.length > 180 || /[\\/\x00-\x1f\x7f]/.test(name)) return "파일 이름을 확인해 주세요. (최대 180자)";

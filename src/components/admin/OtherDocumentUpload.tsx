@@ -9,7 +9,13 @@ import { createOtherDocumentUpload, recordOtherDocumentUpload } from "@/app/ph-c
 type PendingFile = { file: File; signed?: { key: string; path: string; token: string }; uploaded?: boolean };
 
 // Same sequential signed-upload flow as DeviceManager, retaining failed saves for retry.
-export function OtherDocumentUpload({ customerId }: { customerId: string }) {
+export function OtherDocumentUpload({ customerId, actions = {
+  createUpload: createOtherDocumentUpload,
+  recordUpload: recordOtherDocumentUpload,
+} }: { customerId: string; actions?: {
+  createUpload: typeof createOtherDocumentUpload;
+  recordUpload: typeof recordOtherDocumentUpload;
+} }) {
   const router = useRouter();
   const busy = useRef(false);
   const pending = useRef<PendingFile[]>([]);
@@ -34,7 +40,7 @@ export function OtherDocumentUpload({ customerId }: { customerId: string }) {
           const invalid = validateOtherDocument(item.file.name, item.file.size, item.file.type);
           if (invalid) throw new Error(invalid);
           if (!item.signed) {
-            const result = await createOtherDocumentUpload(customerId, item.file.name, item.file.size, item.file.type);
+            const result = await actions.createUpload(customerId, item.file.name, item.file.size, item.file.type);
             if ("error" in result) throw new Error(result.error);
             item.signed = result;
           }
@@ -43,7 +49,7 @@ export function OtherDocumentUpload({ customerId }: { customerId: string }) {
             if (error) { item.signed = undefined; throw new Error(error.message); }
             item.uploaded = true;
           }
-          const result = await recordOtherDocumentUpload(customerId, item.signed.key, item.signed.path);
+          const result = await actions.recordUpload(customerId, item.signed.key, item.signed.path);
           if ("error" in result) throw new Error(result.error);
           saved++;
         } catch (error) {
