@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { site } from "@/lib/site";
 import { ShareLink } from "@/components/admin/ShareLink";
 import { ShareMessage } from "@/components/admin/ShareMessage";
+import { OtherDocumentUpload } from "@/components/admin/OtherDocumentUpload";
+import { isOtherDocument } from "@/lib/admin/other-documents";
+import { otherDocumentFilename } from "@/lib/admin/other-document-path";
 import { AdminDocUpload } from "@/components/admin/AdminDocUpload";
 import { DocGallery, type GalleryItem } from "@/components/admin/DocGallery";
 import { DeviceManager, type DeviceView } from "@/components/DeviceManager";
@@ -153,7 +156,9 @@ export default async function CustomerDetailPage({
       const ext = (row.file_path.split(".").pop() ?? "").toLowerCase();
       const label = row.doc_key.startsWith("device_photo_")
         ? `기기 사진 ${(photoNo += 1)}`
-        : (docLabelMap.get(row.doc_key) ?? row.doc_key);
+        : isOtherDocument(row.doc_key)
+          ? `기타 서류 · ${otherDocumentFilename(row.file_path)}`
+          : (docLabelMap.get(row.doc_key) ?? row.doc_key);
       return { key: row.doc_key, label, url, isImage: IMG_EXT.has(ext) };
     })
     .filter((x): x is GalleryItem => x !== null);
@@ -349,6 +354,12 @@ ${docLines}
         badge={openScr2 ? "현재 단계" : undefined}
       >
         <DocList docs={screening2} customerId={id} docMap={docMap} signedMap={signedMap} />
+        <section className="mt-4 space-y-3 border-t border-navy-200 pt-4" aria-label="기타 서류 (선택)">
+          <h3 className="text-sm font-semibold text-navy-800">기타 서류 <span className="text-xs font-normal text-navy-500">(선택)</span></h3>
+          <p className="text-xs text-navy-500">필요한 경우에만 첨부하세요. 필수 제출·서류 충족률·다음 단계 진행 조건에 포함되지 않습니다.</p>
+          <OtherDocumentUpload customerId={id} />
+          <DocGallery customerId={id} items={galleryItems.filter(item => isOtherDocument(item.key))} deleteAction={deleteDocument} />
+        </section>
       </CollapsibleCard>
 
       <CollapsibleCard
@@ -386,7 +397,7 @@ ${docLines}
         desc="업로드된 서류를 한눈에 확인하고, 선택해서 ZIP으로 내려받을 수 있습니다."
         open
       >
-        <DocGallery customerId={id} items={galleryItems} deleteAction={deleteDocument} />
+        <DocGallery customerId={id} items={galleryItems.filter(item => !isOtherDocument(item.key))} deleteAction={deleteDocument} />
       </CollapsibleCard>
 
       {/* 거래 진정성 증빙 서류 — 진정한 매매+임대차 입증 (내부 관리) */}

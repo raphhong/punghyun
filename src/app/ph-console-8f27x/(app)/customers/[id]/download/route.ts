@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import JSZip from "jszip";
+import { isOtherDocument } from "@/lib/admin/other-documents";
+import { otherDocumentFilename } from "@/lib/admin/other-document-path";
 import { createClient } from "@/lib/supabase/server";
 import {
   SCREENING_2_DOCS,
@@ -74,7 +76,9 @@ export async function GET(
     const ext = path.includes(".") ? path.split(".").pop() : "bin";
     const base = d.doc_key.startsWith("device_photo_")
       ? "기기사진"
-      : (LABELS.get(d.doc_key) ?? d.doc_key);
+      : isOtherDocument(d.doc_key)
+        ? `기타서류_${otherDocumentFilename(path).replace(/\.[^.]+$/, "").replace(/[\\/\x00-\x1f]/g, "_")}`
+        : (LABELS.get(d.doc_key) ?? d.doc_key);
     const key = `${base}.${ext}`;
     const n = used.get(key) ?? 0;
     used.set(key, n + 1);
