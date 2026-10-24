@@ -19,7 +19,7 @@ function fixture() {
     exchange:async(code,verifier,redirect)=>{exchanges++;assert.equal(code,'synthetic-code');assert.equal(redirect,CALLBACK);assert.ok(verifier.length>=43);return {access_token:'SYNTHETIC_ACCESS',refresh_token:'SYNTHETIC_REFRESH',token_type:'Bearer',scope:GMAIL_SCOPE};},
     profile:async()=>({emailAddress:'sol.hong@punghyun.com'})};
   const start=(origin=CONNECT_ORIGIN)=>beginConnect(new Request(CONNECT_ORIGIN+'/api/integrations/gmail/connect',{method:'POST',headers:{origin}}),d);
-  const callback=(state,cookie,extra='&code=synthetic-code')=>finishConnect(new Request(CALLBACK+'?state='+state+extra,{headers:{cookie}}),d);
+  const callback=(state,cookie,extra='&code=synthetic-code')=>finishConnect(new Request(CALLBACK+'?state='+state+'&iss=https%3A%2F%2Faccounts.google.com'+extra,{headers:{cookie}}),d);
   async function flow(){const r=await start();assert.equal(r.status,303);const url=new URL(r.headers.get('location'));return {url,state:url.searchParams.get('state'),cookie:r.headers.get('set-cookie').split(';')[0],response:r};}
   return {d,rows,saved,start,callback,flow,exchanges:()=>exchanges,advance:()=>{now+=600001;}};
 }
@@ -79,6 +79,26 @@ test('malformed/duplicated callback and redirect injection rejected',async()=>{
 });
 test('logout between start and callback prevents exchange',async()=>{
   const f=fixture(),s=await f.flow();f.d.identity=async()=>null;assert.equal((await f.callback(s.state,s.cookie)).status,401);assert.equal(f.exchanges(),0);
+});
+
+test('missing, wrong or duplicate issuer fails before state consumption or exchange',async()=>{
+  for(const issuer of ['', '&iss=https%3A%2F%2Fevil.test', '&iss=https%3A%2F%2Faccounts.google.com.evil.test',
+    '&iss=http%3A%2F%2Faccounts.google.com', '&iss=https%3A%2F%2Faccounts.google.com%2F',
+    '&iss=https%3A%2F%2Faccounts.google.com&iss=https%3A%2F%2Faccounts.google.com']) {
+    const f=fixture(),s=await f.flow();
+    const request=new Request(CALLBACK+'?state='+s.state+'&code=synthetic-code'+issuer,{headers:{cookie:s.cookie}});
+    assert.deepEqual(await(await finishConnect(request,f.d)).json(),{error:'invalid_callback'});
+    assert.equal(f.exchanges(),0);assert.equal(f.saved.length,0);assert.ok(f.rows.has(hash(s.state)));
+  }
+});
+
+test('Google issuer callback with actual parameter shape exchanges and stores once',async()=>{
+  const f=fixture(),s=await f.flow();
+  const q=new URLSearchParams({state:s.state,iss:'https://accounts.google.com',code:'synthetic-code',scope:GMAIL_SCOPE});
+  const request=new Request(CALLBACK+'?'+q,{headers:{cookie:s.cookie}});
+  assert.equal((await finishConnect(request,f.d)).headers.get('location'),RESULT+'?result=connected');
+  assert.equal(f.saved.length,1);assert.equal(f.exchanges(),1);
+  assert.equal((await finishConnect(request,f.d)).status,400);assert.equal(f.exchanges(),1);
 });
 test('only initial mailbox is allowed by default; named extra account needs an explicit allowlist',async()=>{
   const f=fixture();const r=await beginConnect(new Request(CONNECT_ORIGIN+'/api/integrations/gmail/connect?account=synthetic_second',{method:'POST',headers:{origin:CONNECT_ORIGIN}}),f.d);

@@ -94,8 +94,11 @@ export async function finishConnect(request: Request, d: Dependencies) {
     if (!ready(d)) return response('connection_not_configured', 503);
     const url = new URL(request.url), q = url.searchParams;
     if (url.origin !== CONNECT_ORIGIN || request.url.length > 8192 ||
-        [...q.keys()].some(k => !['state','code','error','scope','authuser','prompt'].includes(k)) ||
+        [...q.keys()].some(k => !['state','iss','code','error','scope','authuser','prompt'].includes(k)) ||
         [...q.keys()].some(k => q.getAll(k).length !== 1)) return response('invalid_callback', 400);
+    // Google sends RFC 9207 issuer identification. Pin its exact issuer before
+    // consuming state or exchanging a code; do not accept arbitrary extra fields.
+    if (q.get('iss') !== 'https://accounts.google.com') return response('invalid_callback', 400);
     const state = q.get('state') ?? '';
     const matches = (request.headers.get('cookie') ?? '').split(';').map(x => x.trim())
       .filter(x => x.startsWith(BINDING_COOKIE + '='));
