@@ -15,5 +15,9 @@ export default async function GmailConnection() {
     <form method="post" action="/api/integrations/gmail/connect">
       <button type="submit" disabled={!ready}>Google 읽기 권한 연결</button>
     </form>
+    <form method="post" action="/api/integrations/gmail/read">
+      <p>연결 후 최근 7일 INBOX 메일의 제목과 요약을 최대 20개 확인합니다. 본문 전체·첨부파일·발송 기능은 포함하지 않습니다.</p>
+      <button type="submit" disabled={!ready}>읽기 전용 조회 확인</button>
+    </form>
   </main>;
 }
