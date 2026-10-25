@@ -4,7 +4,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { STAGES } from "@/lib/admin/pipeline";
 import { adminPath } from "@/lib/admin/config";
 
-export function Sidebar({ counts, onNavigate, showCashflow = false }: { counts: Record<string, number>; onNavigate?: () => void; showCashflow?: boolean }) {
+export function Sidebar({ counts, onNavigate, showCashflow = false, showGmail = false }: { counts: Record<string, number>; onNavigate?: () => void; showCashflow?: boolean; showGmail?: boolean }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const activeStage = params.get("stage");
@@ -15,6 +15,7 @@ export function Sidebar({ counts, onNavigate, showCashflow = false }: { counts: 
   }
   return <nav className="ph-sidebar flex flex-col gap-1 p-4" aria-label="어드민 메뉴">
     {item(adminPath(), "대시보드", pathname === adminPath())}
+    {showGmail && item("https://punghyun.vercel.app/ph-console-8f27x/integrations/gmail", "업무 Gmail", pathname === adminPath("integrations/gmail"))}
     {showCashflow && item(adminPath("cashflow"), "월별 현금흐름", pathname === adminPath("cashflow"))}
     <p className="ph-sidebar-label">고객 관리</p>
     {item(customersBase, "전체 고객", onList && !activeStage, counts.__all__ ?? 0)}

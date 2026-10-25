@@ -10,11 +10,13 @@ export function AdminShell({
   counts,
   children,
   canViewCashflow = false,
+  canManageGmail = false,
 }: {
   email?: string;
   counts: Record<string, number>;
   children: React.ReactNode;
   canViewCashflow?: boolean;
+  canManageGmail?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const drawer = useRef<HTMLDialogElement>(null);
@@ -39,7 +41,7 @@ export function AdminShell({
           <span className="font-bold text-white">풍현 관리자</span>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <Sidebar counts={counts} showCashflow={canViewCashflow} />
+          <Sidebar counts={counts} showCashflow={canViewCashflow} showGmail={canManageGmail} />
         </div>
       </aside>
 
@@ -51,7 +53,7 @@ export function AdminShell({
             <span className="font-bold text-white">풍현 관리자</span>
             <button type="button" onClick={() => setOpen(false)} className="ml-auto min-h-11 px-2 text-sm text-white" autoFocus>닫기</button>
           </div>
-          <div className="flex-1 overflow-y-auto"><Sidebar counts={counts} showCashflow={canViewCashflow} onNavigate={() => setOpen(false)} /></div>
+          <div className="flex-1 overflow-y-auto"><Sidebar counts={counts} showCashflow={canViewCashflow} showGmail={canManageGmail} onNavigate={() => setOpen(false)} /></div>
         </aside>
       </dialog>
 
