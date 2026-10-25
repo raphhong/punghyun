@@ -10,6 +10,12 @@ function load(file,mocks){
  const js=ts.transpileModule(readFileSync(new URL('../'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
  const module={exports:{}};new Function('require','module','exports',js)(id=>id in mocks?mocks[id]:require(id),module,module.exports);return module.exports;
 }
+test('owner page renders one accessible read action without duplicate forms',async()=>{
+ const {default:Page}=load('src/app/ph-console-8f27x/integrations/gmail/page.tsx',{'@/lib/admin/gmail-connect-runtime':{gmailDependencies:()=>({identity:async()=>({id:'owner',email:'sol.hong@punghyun.com',verified:true}),config:{ownerId:'owner',enabled:true,clientId:'test'},states:{},secrets:{},exchange:()=>{},profile:()=>{}})}});
+ const html=renderToStaticMarkup(await Page());
+ assert.equal((html.match(/action="\/api\/integrations\/gmail\/read"/g)||[]).length,1);
+ assert.match(html,/min-h-11/);assert.ok(!html.includes('disabled=""'));
+});
 const nav={usePathname:()=>'/ph-console-8f27x/customers',useSearchParams:()=>new URLSearchParams()};
 const {Sidebar}=load('src/components/admin/Sidebar.tsx',{'next/link':{default:({children,...props})=>React.createElement('a',props,children)},'next/navigation':nav,'@/lib/admin/pipeline':{STAGES:[]},'@/lib/admin/config':{adminPath:(sub='')=>'/ph-console-8f27x'+(sub?'/'+sub:'')}});
 const {AdminShell}=load('src/components/admin/AdminShell.tsx',{'./Sidebar':{Sidebar},'@/components/Logo':{LogoMark:()=>null},'@/app/ph-console-8f27x/login/actions':{signOut:()=>{}}});
