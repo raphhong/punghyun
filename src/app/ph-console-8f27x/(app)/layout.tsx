@@ -44,7 +44,8 @@ export default async function AppLayout({
   }
 
   return (
-    <AdminShell email={email} counts={counts} canViewCashflow={Boolean(!adminRes.error && adminRes.data)}>
+    <AdminShell email={email} counts={counts} canViewCashflow={Boolean(!adminRes.error && adminRes.data)}
+      canManageGmail={uid === '874162eb-d569-448b-bc8b-cf103cf46c1c' && email === 'sol.hong@punghyun.com'}>
       {children}
     </AdminShell>
   );
