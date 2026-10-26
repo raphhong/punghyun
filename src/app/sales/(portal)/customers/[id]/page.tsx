@@ -12,8 +12,9 @@ import {
   type DocItem,
 } from "@/lib/admin/pipeline";
 import type { Customer, CustomerDocument } from "@/lib/admin/types";
-import { ShareLink } from "@/components/admin/ShareLink";
-import { ShareMessage } from "@/components/admin/ShareMessage";
+import { ProductShare } from "@/components/sales/ProductShare";
+import { intakeProduct } from "@/lib/sales/intake-product";
+
 import { getSessionAgent } from "@/lib/sales/agent";
 import { OtherDocumentUpload } from "@/components/admin/OtherDocumentUpload";
 import { isOtherDocument } from "@/lib/admin/other-documents";
@@ -39,10 +40,13 @@ const labelCls = "text-xs text-navy-500";
 
 export default async function SalesCustomerDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ product?: string | string[] }>;
 }) {
   const { id } = await params;
+  const product = intakeProduct((await searchParams).product);
   const supabase = await createClient();
   const { agent } = await getSessionAgent();
 
@@ -113,7 +117,7 @@ export default async function SalesCustomerDetail({
   const docLines = docsForType(ALL_DOCS, customer.hospital_type)
     .map((d) => `· ${d.label}${d.hint ? ` (${d.hint})` : ""}`)
     .join("\n");
-  const shareMessage = `[풍현] 서류 제출 안내
+  const shareMessage = `[풍현] 일반렌탈 서류 제출 안내
 
 안녕하세요, 풍현입니다.
 아래 링크에서 기본정보 입력과 필수 서류 업로드를 부탁드립니다.
@@ -195,24 +199,14 @@ ${docLines}
 
       {/* 서류 제출 링크 */}
       <Card
-        title="고객 서류 제출 링크"
-        desc="고객에게 이 링크를 전달하면 로그인 없이 서류를 업로드할 수 있습니다."
+        title="상품별 고객 접수 안내"
+        desc="선택한 상품의 링크와 서류 안내를 함께 복사해 전달하세요."
       >
-        <div className="space-y-4">
-          <ShareLink url={shareUrl} />
-          <p className="text-sm font-semibold">초단기렌탈 전용 고객 접수</p>
-          <ShareLink url={`${shareUrl}/seven-day`} />
-          <div>
-            <p className="mb-2 text-xs font-semibold text-navy-600">
-              고객 안내 문구 (필요 서류 · 링크 포함)
-            </p>
-            <ShareMessage message={shareMessage} />
-          </div>
-        </div>
+        <div id="customer-guide"><ProductShare url={shareUrl} standardMessage={shareMessage} initialProduct={product} /></div>
       </Card>
 
       {/* 서류 현황 */}
-      <Card title="2차 스크리닝 서류">
+      <Card title="일반렌탈 2차 스크리닝 서류 (기존 자료)">
         <DocList
           docs={screening2}
           docMap={docMap}
@@ -241,7 +235,7 @@ ${docLines}
           {!docs.some(row => isOtherDocument(row.doc_key) && row.file_path) && <p className="text-xs text-navy-400">업로드된 기타 서류가 없습니다.</p>}
         </section>
       </Card>
-      <Card title="3차 스크리닝 서류" desc="판매할 기기 · 정보 수집">
+      <Card title="일반렌탈 3차 스크리닝 서류 (기존 자료)" desc="판매할 기기 · 정보 수집">
         <div className="mb-5">
           <p className="mb-2 text-sm font-medium text-navy-700">판매할 기기</p>
           <DeviceManager

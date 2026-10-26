@@ -23,7 +23,7 @@ import {
 } from "./actions";
 
 export const metadata: Metadata = {
-  title: "스크리닝 정보 제출",
+  title: "일반렌탈 · 스크리닝 정보 제출",
   robots: { index: false, follow: false },
 };
 
@@ -123,7 +123,7 @@ export default async function PublicSubmitPage({
         <LogoMark size={36} className="h-9 w-9" />
         <div>
           <p className="text-lg font-bold text-navy-900">풍현</p>
-          <p className="text-sm text-navy-500">스크리닝 정보 제출</p>
+          <p className="text-sm text-navy-500">일반렌탈 · 스크리닝 정보 제출</p>
         </div>
       </div>
 
