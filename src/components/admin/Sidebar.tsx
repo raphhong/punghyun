@@ -19,6 +19,7 @@ export function Sidebar({ counts, onNavigate, showCashflow = false, showGmail = 
     {showCashflow && item(adminPath("cashflow"), "월별 현금흐름", pathname === adminPath("cashflow"))}
     <p className="ph-sidebar-label">고객 관리</p>
     {item(customersBase, "전체 고객", onList && !activeStage, counts.__all__ ?? 0)}
+    {showCashflow && item(adminPath("seven-day-intakes"), "초단기렌탈", pathname === adminPath("seven-day-intakes"))}
     {STAGES.map(stage => item(`${customersBase}?stage=${stage.key}`, stage.label, onList && activeStage === stage.key, counts[stage.key] ?? 0))}
     <p className="ph-sidebar-label">영업 조직</p>
     {item(adminPath("agents"), "영업자 관리", pathname === adminPath("agents"))}
