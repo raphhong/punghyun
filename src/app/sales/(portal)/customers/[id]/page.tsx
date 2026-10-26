@@ -200,6 +200,8 @@ ${docLines}
       >
         <div className="space-y-4">
           <ShareLink url={shareUrl} />
+          <p className="text-sm font-semibold">초단기렌탈 전용 고객 접수</p>
+          <ShareLink url={`${shareUrl}/seven-day`} />
           <div>
             <p className="mb-2 text-xs font-semibold text-navy-600">
               고객 안내 문구 (필요 서류 · 링크 포함)
