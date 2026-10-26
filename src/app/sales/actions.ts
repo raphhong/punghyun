@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { intakeProduct } from "@/lib/sales/intake-product";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -103,6 +104,8 @@ export async function signOutAgent() {
 
 // ── 새 고객 등록 (내 sales_agent_id 로 태깅) ──
 export async function createSalesCustomer(formData: FormData) {
+  const product = intakeProduct(formData.get("intake_product"));
+  if (!product) throw new Error("안내할 상품을 선택하세요.");
   const { agent } = await getSessionAgent();
   if (!agent || agent.status !== "approved") {
     throw new Error("승인된 영업자만 등록할 수 있습니다.");
@@ -128,7 +131,7 @@ export async function createSalesCustomer(formData: FormData) {
 
   if (error) throw new Error(error.message);
   revalidatePath("/sales");
-  redirect(`/sales/customers/${data.id}`);
+  redirect(`/sales/customers/${data.id}?product=${product}#customer-guide`);
 }
 
 // ── 서브트리 고객 검증 헬퍼 ──
