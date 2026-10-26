@@ -4,7 +4,7 @@ import { submitSevenDayIntake } from "@/app/seven-day/actions";
 import { intakeChecks, intakeConditions, type IntakePayload, type ReusableChecks } from "@/lib/admin/short-rental-intake";
 
 const input="mt-1 block w-full rounded-lg border border-navy-200 p-3";
-export function SevenDayIntake({ token = null, initial, devices = [], available = {} }: { token?: string|null; initial?: {name:string;phone:string;company:string};devices?: {id:string;model_name:string|null;quantity:number|null}[]; available?: ReusableChecks }) {
+export function SevenDayIntake({ token, initial, devices = [], available = {} }: { token: string; initial?: {name:string;phone:string;company:string};devices?: {id:string;model_name:string|null;quantity:number|null}[]; available?: ReusableChecks }) {
   const [step,setStep]=useState(0),[message,setMessage]=useState(""),[done,setDone]=useState(false),[pending,start]=useTransition();
   const [requestId]=useState(()=>crypto.randomUUID());
   const [p,setP]=useState<IntakePayload>({name:initial?.name??"",phone:initial?.phone??"",company:initial?.company??"",deviceId:null,model:"",quantity:1,identity:"",condition:"",startDate:"",owner:"",rights:"",resources:"",reuse:{business:"new",identity:"new",authority:"new",account:"new"},conditions:{privacy:"unknown",guarantee:"unknown",undertaking:"unknown",release:"unknown",landlord:"unknown"},confirmed:false});
@@ -14,7 +14,7 @@ export function SevenDayIntake({ token = null, initial, devices = [], available 
   return <form className="space-y-5 rounded-xl border bg-white p-5" onSubmit={e=>{e.preventDefault();if(step<2){setStep(step+1);return;}start(async()=>{const result=await submitSevenDayIntake(requestId,token,p,trap);if("error" in result)setMessage(result.error);else setDone(true);});}}>
     <ol className="flex flex-wrap gap-3 text-sm" aria-label="접수 단계">{["1 기본·자산 정보","2 기존 자료·조건 확인","3 검토 후 제출"].map((label,i)=><li key={label} aria-current={step===i?"step":undefined} className={step===i?"font-bold text-brand-700":"text-navy-500"}>{label}</li>)}</ol>
     <input className="hidden" aria-hidden="true" tabIndex={-1} autoComplete="off" value={trap} onChange={e=>setTrap(e.target.value)} />
-    {step===0&&<div className="space-y-4"><p>{token?"전용 링크에 연결된 고객의 접수입니다. 다른 고객의 자료를 검색하지 않습니다.":"처음 접수할 때는 연락·자산 정보만 입력합니다. 기존 고객은 담당자가 전달한 전용 링크를 이용하면 자료를 재사용할 수 있습니다."}</p>
+    {step===0&&<div className="space-y-4"><p>전용 링크에 연결된 고객의 접수입니다. 다른 고객의 자료를 검색하지 않습니다.</p>
       {field("name","담당자 이름")}{field("phone","연락처")}{field("company","사업자명 / 상호",false)}
       {token&&<label className="block">기존 장비 선택 (없으면 새 장비)<select className={input} value={p.deviceId??""} onChange={e=>{const d=devices.find(d=>d.id===e.target.value);setP({...p,deviceId:d?.id??null,model:d?.model_name??"",quantity:d?.quantity??1});}}><option value="">새 장비</option>{devices.map(d=><option key={d.id} value={d.id}>{d.model_name||"모델 미등록"}</option>)}</select></label>}
       {field("model","장비 모델명")}<label className="block">수량<input className={input} type="number" min="1" max="1000" required value={p.quantity} onChange={e=>setP({...p,quantity:Number(e.target.value)})}/></label>{field("identity","일련번호 / 개별 자산 식별 정보")}{field("condition","장비 상태·기존 사진 위치 (사진은 담당자 확인 후 필요한 것만)")}{field("startDate","희망 시작일")}<p>희망 시작일만 접수합니다. 실제 계약 기산일·종료일·시각은 별도 확인 후 확정합니다.</p>
