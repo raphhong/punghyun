@@ -5,7 +5,6 @@ import { PageHero } from "@/components/PageHero";
 import { ContactForm } from "@/components/ContactForm";
 import { JsonLd } from "@/components/JsonLd";
 import { breadcrumbLd } from "@/lib/seo";
-import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "상담 신청",
@@ -25,7 +24,6 @@ export default function ContactPage() {
       />
 
       <Container className="py-16 sm:py-20">
-        <p className="mb-6 rounded-xl bg-brand-50 p-4">초단기렌탈을 신청하시나요? <Link className="font-semibold underline" href="/seven-day">7일 전용 접수로 이동</Link></p>
         <div className="grid gap-10 lg:grid-cols-5">
           {/* 연락처 정보 */}
           <aside className="lg:col-span-2">

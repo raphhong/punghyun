@@ -12,24 +12,25 @@ test('public intake validates bounded information without requiring files, legal
  assert.equal(lib.reuseAllowed({...fixture(),reuse:{...fixture().reuse,business:'unchanged'}},{}),false);
  assert.equal(lib.reuseAllowed({...fixture(),reuse:{...fixture().reuse,business:'unchanged'}},{business:true}),true);
 });
-test('new public action rejects customer/device/reuse spoofing before constructing privileged client',async()=>{
+test('direct action rejects all tokenless submissions before privileged access',async()=>{
  let access=0,rpc=0;
  const action=loadSource('src/app/seven-day/actions.ts',{'@/lib/supabase/admin':{createAdminClient(){access++;return{rpc:async()=>{rpc++;return{data:{ok:true}}}}}},'@/lib/admin/short-rental-public-access':{shortRentalPublicAccess:async()=>{throw Error('no link')}}});
  for(const p of [{...fixture(),deviceId:other},{...fixture(),reuse:{...fixture().reuse,business:'unchanged'}},{...fixture(),confirmed:false}])assert.ok((await action.submitSevenDayIntake(id,null,p,'')).error);
  assert.equal(access,0);assert.equal(rpc,0);
- assert.deepEqual(await action.submitSevenDayIntake(id,null,fixture(),''),{ok:true});assert.equal(rpc,1);
+ for(const token of [null,undefined,'','bad',{},42])assert.ok((await action.submitSevenDayIntake(id,token,fixture(),'')).error);
+ assert.equal(access,0);assert.equal(rpc,0);
 });
 test('existing link action binds to accessible customer devices and confirmed reusable statuses',async()=>{
  let rpc=0;
- const action=loadSource('src/app/seven-day/actions.ts',{'@/lib/supabase/admin':{createAdminClient(){throw Error('must not run')}},'@/lib/admin/short-rental-public-access':{shortRentalPublicAccess:async token=>{assert.equal(token,id);return{db:{rpc:async()=>{rpc++;return{data:{ok:true}}}},devices:[{id}],available:{business:true}}}}});
+ const action=loadSource('src/app/seven-day/actions.ts',{'@/lib/supabase/admin':{createAdminClient(){throw Error('must not run')}},'@/lib/admin/short-rental-public-access':{shortRentalPublicAccess:async token=>{assert.equal(token,id);return{db:{rpc:async(name,args)=>{assert.equal(name,'submit_short_rental_intake');assert.equal(args.p_token,id);assert.equal(args.p_request,other);rpc++;return{data:{ok:true}}}},devices:[{id}],available:{business:true}}}}});
  assert.ok((await action.submitSevenDayIntake(other,id,{...fixture(),deviceId:other},'')).error);assert.equal(rpc,0);
  assert.deepEqual(await action.submitSevenDayIntake(other,id,{...fixture(),deviceId:id,reuse:{...fixture().reuse,business:'unchanged'}},''),{ok:true});
 });
-test('public page has no customer lookup or prior information on the anonymous route',()=>{
+test('customer form retains the token-scoped intake steps',()=>{
  const {SevenDayIntake}=loadSource('src/components/SevenDayIntake.tsx',{'@/app/seven-day/actions':{}});
- const html=renderToStaticMarkup(React.createElement(SevenDayIntake,{}));
- assert.ok(html.includes('3 검토 후 제출'));assert.ok(html.includes('기존 고객은 담당자가 전달한 전용 링크'));
- assert.ok(!html.includes('기존 장비 선택'));assert.ok(!html.includes('type="file"'));assert.ok(!html.includes('share_token'));
+ const html=renderToStaticMarkup(React.createElement(SevenDayIntake,{token:id}));
+ assert.ok(html.includes('3 검토 후 제출'));assert.ok(html.includes('전용 링크에 연결된 고객의 접수'));
+ assert.ok(html.includes('기존 장비 선택'));assert.ok(!html.includes('type="file"'));assert.ok(!html.includes('share_token'));
 });
 test('photo endpoints reject foreign devices, identity documents and arbitrary paths',async()=>{
  let storage=0;
@@ -55,4 +56,44 @@ test('admin intake page blocks nonadmins before reading submitted customer data'
  let requested=false;
  const {default:Page}=loadSource('src/app/ph-console-8f27x/(app)/seven-day-intakes/page.tsx',{'next/link':()=>null,'@/lib/supabase/server':{createClient:async()=>({auth:{getClaims:async()=>({data:{claims:{sub:id}}})},from(table){if(table==='short_rental_intakes')requested=true;const q={select(){return q},eq(){return q},maybeSingle:async()=>({data:null})};return q}})}});
  const html=renderToStaticMarkup(await Page());assert.ok(html.includes('관리자만'));assert.equal(requested,false);
+});
+
+
+test('anonymous /seven-day is not found without database access or an intake form',()=>{
+ const {default:Page}=loadSource('src/app/seven-day/page.tsx',{'next/navigation':{notFound(){throw Error('NOT_FOUND')}},'@/lib/supabase/admin':{createAdminClient(){throw Error('unexpected DB access')}}});
+ assert.throws(()=>Page(),/NOT_FOUND/);
+});
+test('invalid and unknown customer tokens fail closed in the real gateway, action and page',async()=>{
+ for(const token of ['bad',other]){
+  let writes=0,queries=0;
+  const mocks={'server-only':{},'next/navigation':{notFound(){throw Error('NOT_FOUND')}},'@/lib/supabase/admin':{createAdminClient:()=>({from(table){queries++;assert.equal(table,'customers');return{select(){return this},eq(k,v){assert.equal(k,'share_token');assert.equal(v,token);return this},maybeSingle:async()=>({data:null})}},rpc(){writes++;throw Error('unexpected write')}})}};
+  const {submitSevenDayIntake}=loadSource('src/app/seven-day/actions.ts',mocks);
+  assert.ok((await submitSevenDayIntake(id,token,fixture(),'')).error);
+  const {default:Page}=loadSource('src/app/s/[token]/seven-day/page.tsx',{...mocks,'@/components/SevenDayIntake':{SevenDayIntake:()=>{throw Error('unexpected form')}},'@/components/SevenDayPhoto':{SevenDayPhoto:()=>null}});
+  await assert.rejects(Page({params:Promise.resolve({token})}),/NOT_FOUND/);
+  assert.equal(writes,0);assert.equal(queries,token==='bad'?0:2);
+ }
+});
+test('valid customer page renders its scoped intake and photo continuation',async()=>{
+ const {default:Page}=loadSource('src/app/s/[token]/seven-day/page.tsx',{
+  '@/lib/admin/short-rental-public-access':{shortRentalPublicAccess:async token=>{assert.equal(token,id);return{customer:{representative:'Synthetic customer'},devices:[{id:other,model_name:'Synthetic device'}],available:{}}}},
+  '@/components/SevenDayIntake':{SevenDayIntake:props=>{assert.equal(props.token,id);assert.equal(props.initial.name,'Synthetic customer');return React.createElement('form',{'data-test':'intake'});}},
+  '@/components/SevenDayPhoto':{SevenDayPhoto:props=>{assert.equal(props.token,id);assert.equal(props.deviceId,other);return React.createElement('span',{},'photo continuation');}}
+ });
+ const html=renderToStaticMarkup(await Page({params:Promise.resolve({token:id})}));assert.ok(html.includes('data-test="intake"'));assert.ok(html.includes('photo continuation'));
+});
+test('general contact page keeps its consultation form without a public short-rental entry',()=>{
+ const {default:Page}=loadSource('src/app/contact/page.tsx',{'@/components/ContactForm':{ContactForm:()=>React.createElement('form',{'data-test':'general-contact'})}});
+ const html=renderToStaticMarkup(React.createElement(Page));assert.ok(html.includes('data-test="general-contact"'));assert.ok(!html.includes('/seven-day'));
+});
+test('general contact API still accepts valid enquiries with isolated mail transport',async()=>{
+ const previous=process.env.RESEND_API_KEY,originalFetch=globalThis.fetch;
+ let calls=0;
+ try{
+  process.env.RESEND_API_KEY='synthetic-test-key';
+  globalThis.fetch=async(url,options)=>{calls++;assert.equal(url,'https://api.resend.com/emails');assert.ok(JSON.parse(options.body).subject.includes('Synthetic'));return{ok:true}};
+  const {POST}=loadSource('src/app/api/contact/route.ts');
+  const response=await POST(new Request('https://example.test/api/contact',{method:'POST',body:JSON.stringify({name:'Synthetic',phone:'010-0000-0000'})}));
+  assert.equal(response.status,200);assert.equal((await response.json()).ok,true);assert.equal(calls,1);
+ }finally{globalThis.fetch=originalFetch;if(previous===undefined)delete process.env.RESEND_API_KEY;else process.env.RESEND_API_KEY=previous;}
 });
