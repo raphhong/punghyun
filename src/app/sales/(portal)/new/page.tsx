@@ -28,7 +28,7 @@ export default async function SalesNewCustomerPage({ searchParams }: { searchPar
         </Link>
       </div>
 
-      <p className="text-sm text-navy-500">공통 고객으로 등록한 뒤 선택한 상품의 안내문으로 이동합니다. 계약 확정이나 기존 거래의 상품 전환이 아닙니다. <Link className="underline" href="/sales/new">상품 다시 선택</Link></p>
+      <p className="text-sm text-navy-500">고객 등록 후 선택한 상품의 접수 안내 화면으로 이동합니다. <Link className="underline" href="/sales/new">상품 다시 선택</Link></p>
       <form
         action={createSalesCustomer}
         className="space-y-5 rounded-2xl border border-navy-100 bg-white p-6"
