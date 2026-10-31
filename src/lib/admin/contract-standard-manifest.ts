@@ -5,3 +5,28 @@ const canonicalManifest:StandardManifest=Object.freeze({version:'synthetic-seven
 export const sevenDayCommercialDefaults=Object.freeze({policyVersion:'seven-day-commercial-v2',product:'seven_day',depositWon:0,lateDamagesAnnualPercent:7,payoutAfterConditionsBusinessDays:1,conditionsDeadlineBusinessDays:5,removalNoticeBusinessDays:2,penaltyPercent:10,penaltyBase:'supply_excluding_vat',cureBusinessDays:5,additionalInsuranceRequired:false,punghyunInsuredRequired:false,pledgeRequired:false,customerSpecificExceptions:'unknown',privateClauseBinding:'pending'} as const);
 export function standardSnapshot():StandardManifest{return Object.freeze({...canonicalManifest,parts:Object.freeze([...canonicalManifest.parts]),fields:Object.freeze([...canonicalManifest.fields]),assetFields:Object.freeze([...canonicalManifest.assetFields])});}
 export const sevenDayManifest=standardSnapshot();
+
+export type HierarchicalField=Readonly<{token:string;origin:'customer_snapshot'|'deal_snapshot'|'fixed_policy'|'manual_fact';path:string;group:string}>;
+const basicFields:HierarchicalField[]=[...['name','type','number','address','signer','contact'].map(k=>({token:`customer.${k}`,origin:'customer_snapshot' as const,path:`customer.${k}`,group:'기본 정보'})),...['purchaseBase','purchaseVat','purchaseTotal','rentalBase','rentalVat','rentalTotal','startDate','expiryDate'].map(k=>({token:`trade.${k}`,origin:'deal_snapshot' as const,path:`trade.${k}`,group:'거래 정보'})),...['depositWon','lateDamagesAnnualPercent','payoutAfterConditionsBusinessDays','conditionsDeadlineBusinessDays','removalNoticeBusinessDays','penaltyPercent','cureBusinessDays','penaltyBase'].map(k=>({token:`policy.${k}`,origin:'fixed_policy' as const,path:k,group:'고정 조건'})),...Array.from({length:67},(_,i)=>({token:`review.fact${String(i+1).padStart(2,'0')}`,origin:'manual_fact' as const,path:`review.fact${String(i+1).padStart(2,'0')}`,group:i<21?'검수 자료':i<42?'권리 자료':'거래 근거'}))];
+function freezeTree<T>(value:T):T{if(value&&typeof value==='object'){for(const child of Object.values(value))freezeTree(child);Object.freeze(value);}return value;}
+// A second SYNTHETIC registry entry only. External sidecars cannot register templates or clauses.
+const hierarchicalCanonical=freezeTree({version:'synthetic-hierarchical-v60',sourceHash:'f2fc8caa5312260ef41e8a4eae4b8c073c2e87f30d367113d78fae8d4c6cc29c',mode:'synthetic_only' as const,parts:[...canonicalManifest.parts],fields:basicFields,repeatGroups:[{id:'asset_main',tableIndex:0,fields:['id','model','serial','quantity']},{id:'asset_inspection',tableIndex:1,fields:['id','model','serial','quantity']}],variant:{id:'expiry_once_bank_holiday_next_business_day',token:'variant.payment',text:'SYNTHETIC VARIANT ONLY · '+Array.from({length:24},(_,i)=>`합성 조건 확인 ${i+1}.`).join(' '),textHash:'f574ab33c1ee50cb2a0bd3e4419fae220f808cc6550e86618289c420efa73250',sourceParagraphHash:'4e124f003c51199cf658f8dda750433913ad76ade9ceb3a44622beed11112ccb'},policyVersion:'seven-day-commercial-v2'});
+export function hierarchicalSnapshot(){return freezeTree(structuredClone(hierarchicalCanonical));}
+
+// Independently verified technical registry candidate. Private source stays in the user's browser.
+// Historical replay verification does not approve this source for new transactions.
+const manualStandardCanonical=freezeTree({id:'seven-day-private-standard',product:'seven_day',version:'manual-standard-v75-technical-candidate',sourceHash:'c14e42d42f4c8df3d0bf1226dc4f95a7e823c16cbbfc532dc10516f41d01ec07',commercialPolicyVersion:'seven-day-commercial-v2',status:'pending' as const,approvalRef:null,layoutPolicyHash:null,variantPolicyHash:null,sourcePolicyDigest:'9e196fafcd9d302eb53337a6f2672d456269126b53cbf2285a4f1080766e436b',executionPlanHash:'f7e683d9ea2ad7f265d29db090d88f022072beb630b20142e38b3ef38fdda089' as string|null,configurationHash:'56326aee1215fbf29ed861b60decfbd34438f82f30ea3f0e0709a3f3f0b95994',spanMappingHash:'654b3e64dd24b6e159797f34de5b0555e7b18b74f42327ebc66cd6cfbb292d32',technicalStatus:'independently_verified_candidate' as const,registrationReason:'local_technical_pin_current_case_review_required',manualSigningUploadAllowed:false as const});
+export function manualStandardSnapshot(){return freezeTree(structuredClone(manualStandardCanonical));}
+
+export const manualPolicySourceDigest='9e196fafcd9d302eb53337a6f2672d456269126b53cbf2285a4f1080766e436b';
+export type DomainCommercialAnchor={id:string;sourceHash:string;domains:{domain:'raw_candidate'|'materialized_variant';part?:string;paragraph?:number;variantId?:string;sourceTextHash:string;normalization:'none'|'python_whitespace';offsetUnit:'unicode_code_points';spans:{start:number;endExclusive:number;textHash:string}[]}[]};
+export type ManualCommercialAnchor={id:string;sourceHash:string;part:string;paragraph:number;page:number;start:number;end:number;textHash:string}|DomainCommercialAnchor;
+export type ManualPolicyDescriptor={
+ schemaVersion:'manual-policy-descriptor-v68';sourcePolicyDigest:string;templateSourceHash:string;layoutPolicyHash:string;
+ paymentVariantId:'expiry_once_bank_holiday_next_business_day';
+ fields:{key:string;label:string;group:'auto_fill'|'evidence'|'exception';kind:'text'|'amount'|'date';required:boolean}[];
+ rules:{id:string;kind:'fact_data'|'case_choice'|'conditional_annex';variantId:string;label:string;dataKeys:string[];
+  options:{id:string;patternHash:string;fieldKeys:string[];requiredEvidenceKeys:string[];explicitSelection:boolean;supported:boolean}[];
+ }[];
+ commercialAnchors:ManualCommercialAnchor[];
+};
