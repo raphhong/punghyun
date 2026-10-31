@@ -264,6 +264,8 @@ ${docLines}
 
       </div>
 
+      <Link href={adminPath(`customers/${id}/contract`)} className="inline-flex rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white">계약 생성 준비</Link>
+
       {/* 단계 진행바 (이동 · 직접 점프 통합) */}
       <StageStepper
         id={id}
