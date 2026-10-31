@@ -7,7 +7,7 @@ export type FieldBinding={slot:string;field:ContractField;providerFieldId:string
 // Confirmed internal variant identifier; private full wording/provider binding still pending.
 export const paymentChoices={expiry_once_bank_holiday_next_business_day:'만기 일시 납부 · 은행 휴일이면 다음 영업일'} as const;
 export type PaymentChoice=keyof typeof paymentChoices;
-export const sevenDayPolicy=Object.freeze({id:'seven-day-fixed-v1',product:'seven_day',sourceStatus:'awaiting_private_standard',summary:'보험·위약벌은 기준본 고정입니다. 전체 문구 확인 전입니다.',insurance:'추가 보험 가입·풍현 피보험자·질권 의무 없음',penalty:'10% · 공급가액(VAT 제외) 기준 · 시정 요구 5영업일'});
+export const sevenDayPolicy=Object.freeze({id:'seven-day-commercial-v2',product:'seven_day',sourceStatus:'awaiting_private_standard',summary:'보험·위약벌은 기준본 고정입니다. 전체 문구 확인 전입니다.',insurance:'추가 보험 가입·풍현 피보험자·질권 의무 없음',penalty:'10% · 공급가액(VAT 제외) 기준 · 시정 요구 5영업일',depositWon:0,lateDamagesAnnualPercent:7,payoutAfterConditionsBusinessDays:1,conditionsDeadlineBusinessDays:5,removalNoticeBusinessDays:2,customerSpecificExceptions:'unknown'});
 export type ClauseException={kind:'insurance'|'penalty';proposal:string;reason:string};
 export function prepareSevenDay(source:ImportedStandard,mappings:FieldBinding[],values:Record<ContractField,string>,templateId:string,payment:PaymentChoice,exceptions:ClauseException[]=[]){
  if(!Object.prototype.hasOwnProperty.call(paymentChoices,payment))throw Error('payment_required');
