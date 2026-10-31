@@ -30,3 +30,6 @@ export type ManualPolicyDescriptor={
  }[];
  commercialAnchors:ManualCommercialAnchor[];
 };
+
+// PROPOSED: explicit technical review-only bundle; never a signing registry.
+export function reconstructedReviewBundleSnapshot(){return {"sourceSha256":"c14e42d42f4c8df3d0bf1226dc4f95a7e823c16cbbfc532dc10516f41d01ec07","manifestSha256":"e6b83ac10d652437007e8861ee89d44592a316f44847bc5508543d38fd14031d","policyDigest":"2ba67ba5baeff3dbea405ab80c59a4f9138c0330d03f2c7190fd08fd92f40247","layoutSha256":"b5be35bf88eccd7aee2af920732884953708bcaa144308d32d6f1951ef2ccb29","adapterMetadataDigest":"95056281a307e5bacdf3652c249bcc28c304735da06c72949b8b1648b2bdd1e2"};}

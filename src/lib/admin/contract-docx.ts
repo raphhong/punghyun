@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import {standardSnapshot,manualStandardSnapshot,type StandardManifest} from './contract-standard-manifest';
+import {standardSnapshot,manualStandardSnapshot,reconstructedReviewBundleSnapshot,type StandardManifest} from './contract-standard-manifest';
 import {validateDocumentInput,validateManualPolicyDescriptor,type DocumentInput} from './contract-document-model';
 const canonical=standardSnapshot();
 const W='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
@@ -369,6 +369,18 @@ export async function generateManualCaseReview(bytes:Uint8Array,raw:ManualReview
  if(pkg.schemaVersion!=='manual-review-package-v70'||input.customerId!==context.customerId||input.caseId!==context.caseId||!context.customerId||!context.caseId)throw Error('manual_context_mismatch');
  if(pkg.policy.templateSourceHash!==standard.sourceHash||pkg.layout.sourceHash!==standard.sourceHash||await digest(bytes)!==standard.sourceHash)throw Error('manual_standard_source_mismatch');
  if(await privateObjectDigest(pkg.layout as unknown as Record<string,unknown>)!==pkg.policy.layoutPolicyHash)throw Error('manual_layout_policy_mismatch');
+ const reviewPins=reconstructedReviewBundleSnapshot();
+ if(pkg.policy.sourcePolicyDigest===reviewPins.policyDigest){
+  if(!pkg.privateBundle)throw Error('review_private_bundle_required');
+  if(!pkg.executionPolicy||await manualPackageConfigurationHash(pkg)!==pkg.executionPolicy.configurationHash)throw Error('review_execution_configuration_mismatch');
+  if(await privateObjectDigest(pkg.executionPolicy as unknown as Record<string,unknown>)!=='d14e4d0f6f2896ef38b8853403814760bad02527a977c312d87fd31d6fdc50b9')throw Error('review_execution_plan_mismatch');
+  const {inspectManualExecutionPolicy}=await import('./contract-document-model');
+  const reviewEligibility=inspectManualExecutionPolicy(pkg.executionPolicy,pkg.policy,input);
+  if(reviewEligibility.blockers.some(b=>!(b.item==='fact_span_coverage'&&b.kind==='technical'&&pkg.executionPolicy!.factSpanCoverage?.status==='pending')))throw Error('review_execution_conditions_unmet');
+  const verified=await verifyPrivatePolicyBundle(bytes,pkg.privateBundle.policy,pkg.privateBundle.sidecar,pkg.layout,pkg.privateBundle.metadata,reviewPins);
+  for(const rule of pkg.policy.rules){const source=verified.variants.find(v=>v.id===rule.variantId);if(!source||rule.options.some(o=>o.supported&&o.patternHash!==source.sourceClauseSha256))throw Error('review_unapproved_alternative');}
+ }
+
  validateManualAssetConsistency(pkg,input);const state=inspectManualPolicyCase(pkg.policy,input);if(!state.caseDataComplete)throw Error('manual_case_checks_required');
  if(pkg.policy.fields.some(f=>f.kind==='amount')){
   if(!pkg.commercial)throw Error('manual_commercial_binding_required');
@@ -431,6 +443,7 @@ export async function manualPackageConfigurationHash(pkg:ManualReviewPackage){
 export async function prepareManualSigningDocument(bytes:Uint8Array,raw:ManualReviewPackage,data:import('./contract-document-model').ManualCaseData,context:{customerId:string;caseId:string}){
  bytes=new Uint8Array(bytes);data=structuredClone(data);context={...context};const pkg=structuredClone(raw);const {inspectManualExecutionPolicy}=await import('./contract-document-model');const standard=manualStandardSnapshot(),plan=pkg.executionPolicy;
  if(!plan)throw Error('manual_execution_mapping_required');
+ if(pkg.policy.sourcePolicyDigest===reconstructedReviewBundleSnapshot().policyDigest)throw Error('review_only_source_not_signing_registered');
  // Only an independently reviewed code registry can pin an execution mapping. Import cannot register itself.
  if(!standard.executionPlanHash)throw Error('manual_execution_mapping_not_registered');
  if(await privateObjectDigest(plan as unknown as Record<string,unknown>)!==standard.executionPlanHash)throw Error('manual_execution_mapping_mismatch');
@@ -489,7 +502,7 @@ async function resolveManualFactPatterns(bytes:Uint8Array,pkg:ManualReviewPackag
  const spans=pkg.executionPolicy?.editableFactSpans,assetBindings=pkg.assetVariantBindings??[],summaryBindings=pkg.sharedSummaryVariantBindings??[];
  if(!spans?.length&&!assetBindings.length&&!summaryBindings.length)return {expected,traces,anchorChecks,rawProofs,sharedSummaryTrace};
  const plan=pkg.executionPolicy,bundle=pkg.privateBundle,standard=manualStandardSnapshot();if(!plan||!bundle)throw Error('fact_pattern_bundle_required');
- const verified=await verifyPrivatePolicyBundle(bytes,bundle.policy,bundle.sidecar,pkg.layout,bundle.metadata,{sourceSha256:standard.sourceHash,policyDigest:standard.sourcePolicyDigest,manifestSha256:plan.manifestSha256,layoutSha256:plan.layoutSha256,adapterMetadataDigest:plan.adapterMetadataDigest});
+ const verified=await verifyPrivatePolicyBundle(bytes,bundle.policy,bundle.sidecar,pkg.layout,bundle.metadata,pkg.policy.sourcePolicyDigest===reconstructedReviewBundleSnapshot().policyDigest?reconstructedReviewBundleSnapshot():{sourceSha256:standard.sourceHash,policyDigest:standard.sourcePolicyDigest,manifestSha256:plan.manifestSha256,layoutSha256:plan.layoutSha256,adapterMetadataDigest:plan.adapterMetadataDigest});
  const byId=new Map(verified.variants.map(v=>[v.id,v])),sha=(s:unknown)=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s),hash=(s:string)=>digest(new TextEncoder().encode(s));
  for(const span of spans??[]){if(span.evidenceKeys!==undefined&&(!Array.isArray(span.evidenceKeys)||!span.evidenceKeys.length||new Set(span.evidenceKeys).size!==span.evidenceKeys.length||span.evidenceKeys.some(k=>typeof k!=='string'||!k.trim())))throw Error('invalid_span_evidence_mapping');if(span.offsetUnit!=='unicode_code_points'||!byId.has(span.variantId)||span.sourceClauseHash!==byId.get(span.variantId)!.sourceClauseSha256||!sha(span.sourceSpanHash)||!pkg.policy.fields.some(f=>f.key===span.fieldKey))throw Error('unregistered_fact_span');}
  const normalized=(s:string,n:'none'|'python_whitespace')=>n==='none'?s:normalizePrivateSourceWhitespace(s),normalization=bundle.metadata.sourceClauseHashMode==='exact_utf8'?'none':'python_whitespace';
