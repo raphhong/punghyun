@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-export const schemaVersion='contract-ai-v86';
+export const schemaVersion='contract-ai-v95';
 export type Scope={actorId:string;tenantId:string;customerId:string;caseId:string;revision:string};
 export type Source={id:string;version:string;sha256:string;bytes:Uint8Array;customerId:string;assetId:string|null;mime:string};
 export type Segment={id:string;sourceId:string;version:string;sha256:string;locator:string;text:string;assetId?:string|null};
@@ -8,10 +8,18 @@ export type Result={status:'waiting_provider'|'needs_review';mode:'mock'|'live'|
 export type Ports={policyVersion?:string;scope():Promise<Scope>;sources(ids:string[],scope:Scope):Promise<Source[]>;extract(source:Source):Promise<Segment[]>;minimize(segments:Segment[],scope:Scope):Promise<Segment[]>;model:null|{mode:'mock'|'live';analyze(segments:Segment[],signal:AbortSignal,beforeDispatch?:()=>Promise<void>):Promise<unknown>};reserve(binding:string,key:string):Promise<boolean>};
 export const sha=(b:Uint8Array|string)=>createHash('sha256').update(b).digest('hex');
 export const reviewSourceSnapshot=(scope:Scope,sources:Source[])=>sha(JSON.stringify([scope.tenantId,scope.customerId,scope.caseId,sources.map(s=>[s.id,s.version,s.sha256,sha(s.bytes),s.assetId,s.mime]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]));
-const obj=(p:Record<string,unknown>)=>({type:'object',properties:p,required:Object.keys(p),additionalProperties:false});const str={type:'string'};
-export const resultSchema=obj({facts:{type:'array',items:obj({field:str,value:str,quote:str,segment:str,unit:str,vat:str,period:str})}});
 export const fields=['customer.name','asset.model','asset.serial','purchase.total','rent.net','rent.vat','rent.total','rent.rate','contract.date','contract.days'] as const;
-export function decode(raw:unknown,segments:Segment[]):Fact[]{if(!raw||typeof raw!=='object'||Object.keys(raw).join()!=='facts'||!Array.isArray((raw as {facts:unknown}).facts))throw Error('ai_schema');const facts=(raw as {facts:unknown[]}).facts;if(facts.length>100)throw Error('ai_schema');return facts.map(x=>{if(!x||typeof x!=='object'||Object.keys(x).sort().join()!=='field,period,quote,segment,unit,value,vat')throw Error('ai_schema');const f=x as Fact;if(Object.values(f).some(v=>typeof v!=='string'||v.length>2000)||!fields.includes(f.field as typeof fields[number]))throw Error('ai_schema');const s=segments.find(s=>s.id===f.segment);if(!s||!f.quote.trim()||!s.text.includes(f.quote)||!f.value.trim()||!f.quote.includes(f.value))throw Error('ai_citation');if(/total|net|vat|rate|days/.test(f.field)&&!Array.from(f.quote.matchAll(/[+-]?\d+(?:,\d+)*(?:\.\d+)?(?:[eE][+-]?\d+)?/g),m=>m[0]).includes(f.value))throw Error('ai_numeric_citation');return f;});}
+const obj=(p:Record<string,unknown>)=>({type:'object',properties:p,required:Object.keys(p),additionalProperties:false});const str={type:'string',maxLength:2000};
+export const resultSchema=obj({facts:{type:'array',maxItems:100,items:obj({field:{type:'string',enum:[...fields]},value:str,quote:str,segment:str,unit:str,vat:str,period:str})}});
+export type SchemaIssue={reason:'root_shape'|'facts_limit'|'fact_shape'|'string_type_or_length'|'field_not_allowed';factIndex:number|null};
+/** Safe diagnostic classification only: never includes returned names, values, or quotations. */
+export function inspectFactSchema(raw:unknown):SchemaIssue|null{
+ if(!raw||typeof raw!=='object'||Object.keys(raw).join()!=='facts'||!Array.isArray((raw as {facts:unknown}).facts))return {reason:'root_shape',factIndex:null};
+ const facts=(raw as {facts:unknown[]}).facts;if(facts.length>100)return {reason:'facts_limit',factIndex:null};
+ for(let i=0;i<facts.length;i++){const x=facts[i];if(!x||typeof x!=='object'||Object.keys(x).sort().join()!=='field,period,quote,segment,unit,value,vat')return {reason:'fact_shape',factIndex:i};const f=x as Fact;if(Object.values(f).some(v=>typeof v!=='string'||Array.from(v).length>2000))return {reason:'string_type_or_length',factIndex:i};if(!fields.includes(f.field as typeof fields[number]))return {reason:'field_not_allowed',factIndex:i};}return null;
+}
+export function decode(raw:unknown,segments:Segment[]):Fact[]{const issue=inspectFactSchema(raw);if(issue)throw Object.assign(Error('ai_schema'),{schemaIssue:issue});const facts=(raw as {facts:Fact[]}).facts;return facts.map(f=>{ 
+const s=segments.find(s=>s.id===f.segment);if(!s||!f.quote.trim()||!s.text.includes(f.quote)||!f.value.trim()||!f.quote.includes(f.value))throw Error('ai_citation');if(/total|net|vat|rate|days/.test(f.field)&&!Array.from(f.quote.matchAll(/[+-]?\d+(?:,\d+)*(?:\.\d+)?(?:[eE][+-]?\d+)?/g),m=>m[0]).includes(f.value))throw Error('ai_numeric_citation');return f;});}
 /** Limited deterministic semantics. Missing textual support stays unverified; no inferred conversion. */
 function numericMeaningUnverified(f:Fact){
  if(!/^\d+(\.\d+)?$/.test(f.value))return true;
