@@ -1,8 +1,0 @@
-// LOCAL-ONLY server candidate. Not connected to browser requests or hosted storage.
-import {createHash} from 'node:crypto';
-import type {LocalDatabasePort} from './glosign-repository';
-import {reviewContext,validateFinding,type ReviewContext,type ReviewSource,type Finding} from './contract-evidence-review';
-export class LocalExtractionEvents{
- constructor(private db:LocalDatabasePort){db.exec('PRAGMA busy_timeout=2000; CREATE TABLE IF NOT EXISTS local_extraction_events(tenant TEXT,event TEXT, fingerprint TEXT NOT NULL,PRIMARY KEY(tenant,event));');}
- accept(c:ReviewContext,source:ReviewSource,event:string,findings:Finding[],fields:string[],keys:string[]){if(!c.tenantId||!/^[-\w]{8,100}$/.test(event)||findings.length>200)throw Error('extraction_scope_required');const ids=new Set<string>();for(const f of findings){validateFinding(f,c,source,fields,keys);if(ids.has(f.id))throw Error('duplicate_finding');ids.add(f.id);}const fp=createHash('sha256').update(JSON.stringify([reviewContext(c),source.documentId,source.version,source.sha256,findings.map(f=>[f.id,f.field,f.value,f.locator,f.state,f.evidenceKey,f.assetId]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))] )).digest('hex');this.db.exec('BEGIN IMMEDIATE');try{const old=this.db.prepare('SELECT fingerprint FROM local_extraction_events WHERE tenant=? AND event=?').get(c.tenantId,event);if(old&&old.fingerprint!==fp)throw Error('extraction_event_conflict');if(!old)this.db.prepare('INSERT INTO local_extraction_events VALUES(?,?,?)').run(c.tenantId,event,fp);this.db.exec('COMMIT');return {duplicate:!!old,fingerprint:fp,status:'human_review_required' as const};}catch(e){this.db.exec('ROLLBACK');throw e;}}
-}
