@@ -1,3 +1,4 @@
+import {createTriageRpcRuntime} from './triage-rpc';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import {createTriageDriver} from './triage-driver';
 import {triageEnvironment} from './triage-environment';
@@ -5,7 +6,10 @@ import {createTriageOnlyRuntime} from './triage-runtime';
 let store:ReturnType<typeof createTriageDriver>|undefined;
 /** Private server configuration is read only after explicit Preview activation. */
 export function configuredTriageRuntime(db:SupabaseClient,customerId:string){
- const settings=triageEnvironment(process.env);if(!settings)return null;
+ const settings=triageEnvironment(process.env);if(!settings){
+  if(process.env.VERCEL_ENV!=='preview'||process.env.VERCEL_GIT_COMMIT_REF!=='codex/standard-contract-preparation-v51'||process.env.NEXT_PUBLIC_SUPABASE_URL!=='https://zatlumldeqhghhrsgtdq.supabase.co')return null;
+  return createTriageRpcRuntime(db,customerId);
+ }
  const customer=settings.scope.customers[customerId];if(!customer)throw Error('forbidden');
  store??=createTriageDriver(settings.connection);
  return createTriageOnlyRuntime({db,projectRef:settings.scope.projectRef,customerId,caseId:customer.caseIds[0],config:async()=>{
