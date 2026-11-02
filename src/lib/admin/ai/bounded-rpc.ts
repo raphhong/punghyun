@@ -35,7 +35,7 @@ export function createBoundedReviewRuntime(input:{db:SupabaseClient;env:Record<s
     if(documentId!==input.documentId)throw Error('forbidden');const r=await rpc(action,cap,receipt,mac);
     if(!r||Object.keys(r).sort().join()!=='authorization,slot'||sha(canonicalAttachment(r.authorization))!==authorizationHash)throw Error('context_changed');return r.slot;
    }};
-   return handleAttachmentReview(request,ports,{policy:'bounded-review-v104:'+a.id+':'+a.policyHash,syntheticOnly:a.dataClass==='synthetic',pin,minimize:async(segments,scope)=>{
+   return handleAttachmentReview(request,ports,{selectedFields:a.release.selectedFields,policy:'bounded-review-v104:'+a.id+':'+a.policyHash,syntheticOnly:a.dataClass==='synthetic',pin,minimize:async(segments,scope)=>{
     const selected=await minimize(segments,scope);if(Buffer.byteLength(JSON.stringify(selected))>8000)throw Error('minimization_required');return selected;
    }});
   }catch(e){const code=safe(e);return Response.json({code,financialApproval:false,automaticRetryAllowed:false},{headers,status:code==='forbidden'?403:code==='invalid_request'?400:code==='budget_exhausted'?429:['source_changed','context_changed','attachment_expired','receipt_conflict'].includes(code)?409:503});}

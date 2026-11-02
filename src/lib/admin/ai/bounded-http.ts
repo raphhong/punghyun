@@ -1,5 +1,5 @@
 import {createBoundedReviewRuntime} from './bounded-rpc';
-type Config=Omit<Parameters<typeof createBoundedReviewRuntime>[0],'documentId'|'approvalId'>;
+type Config=Omit<Parameters<typeof createBoundedReviewRuntime>[0],'documentId'|'approvalId'>&{resolveApprovalId?:(documentId:string)=>Promise<string>};
 /** Server route bridge: current SSR client and route customer supplied by server composition.
  * No approval, actor, tenant, release plan, cost, or result can be asserted by request JSON. */
 export function createBoundedReviewEndpoint(config:Config){return async(request:Request)=>{
@@ -15,6 +15,6 @@ export function createBoundedReviewEndpoint(config:Config){return async(request:
    forward=new Request(request.url,{method:'POST',headers:request.headers,body:JSON.stringify(body),signal:request.signal});
   }
   if(typeof documentId!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(documentId))throw Error('invalid_request');
-  return createBoundedReviewRuntime({...config,documentId})(forward);
- }catch{return Response.json({code:'invalid_request',financialApproval:false,automaticRetryAllowed:false},{status:400,headers});}
+  const approvalId=config.resolveApprovalId?await config.resolveApprovalId(documentId):undefined;return createBoundedReviewRuntime({...config,documentId,approvalId})(forward);
+ }catch(e){const code=e instanceof Error&&['approval_required','forbidden','repository_unavailable'].includes(e.message)?e.message:'invalid_request';return Response.json({code,financialApproval:false,automaticRetryAllowed:false},{status:code==='forbidden'?403:code==='invalid_request'?400:503,headers});}
 };}

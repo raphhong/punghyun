@@ -1,0 +1,19 @@
+// Local verification adapter requires Node 22.13+; not a hosted persistence binding.
+interface LocalDatabase {exec(sql:string):void;close():void;prepare(sql:string):{get(...args:(string|number)[]):unknown;all(...args:(string|number)[]):unknown[];run(...args:(string|number)[]):unknown}}
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Node 20 type package omits the Node 24 local SQLite runtime
+const {DatabaseSync}=require('node:sqlite') as {DatabaseSync:new(path:string)=>LocalDatabase};
+import {createHash} from 'node:crypto';
+export type ReleaseRow={registered?:boolean;id:string;tenant:string;customer:string;actor:string;key:string;digest:string;payload:string;status:'draft'|'confirmed_local'|'revoked';revision:number;expires:number};
+export class ReleaseApprovalStore{
+ readonly db:LocalDatabase;
+ constructor(path:string){this.db=new DatabaseSync(path);this.db.exec(`PRAGMA busy_timeout=1000;CREATE TABLE IF NOT EXISTS release_rows(id TEXT PRIMARY KEY,tenant TEXT NOT NULL,customer TEXT NOT NULL,actor TEXT NOT NULL,key TEXT NOT NULL,digest TEXT NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL,revision INTEGER NOT NULL,expires INTEGER NOT NULL,UNIQUE(tenant,customer,actor,key));CREATE TABLE IF NOT EXISTS release_audit(seq INTEGER PRIMARY KEY AUTOINCREMENT,release_id TEXT NOT NULL,event TEXT NOT NULL,digest TEXT NOT NULL,previous TEXT NOT NULL,hash TEXT NOT NULL,recorded_at INTEGER NOT NULL,UNIQUE(release_id,event));`);}
+ get(id:string){return this.db.prepare('SELECT * FROM release_rows WHERE id=?').get(id) as ReleaseRow|undefined;}
+ byKey(tenant:string,customer:string,actor:string,key:string){return this.db.prepare('SELECT * FROM release_rows WHERE tenant=? AND customer=? AND actor=? AND key=?').get(tenant,customer,actor,key) as ReleaseRow|undefined;}
+ latest(tenant:string,customer:string,actor:string,documentId:string){return this.db.prepare("SELECT * FROM release_rows WHERE tenant=? AND customer=? AND actor=? AND json_extract(payload,'$.documentId')=? ORDER BY rowid DESC LIMIT 1").get(tenant,customer,actor,documentId) as ReleaseRow|undefined;}
+ private audit(r:ReleaseRow,event:string){const prior=this.db.prepare('SELECT hash FROM release_audit WHERE release_id=? ORDER BY seq DESC LIMIT 1').get(r.id) as {hash:string}|undefined;const previous=prior?.hash??'0'.repeat(64),recordedAt=Date.now(),hash=createHash('sha256').update(JSON.stringify([r.id,event,r.digest,previous,recordedAt])).digest('hex');this.db.prepare('INSERT INTO release_audit(release_id,event,digest,previous,hash,recorded_at) VALUES(?,?,?,?,?,?)').run(r.id,event,r.digest,previous,hash,recordedAt);}
+ private transaction<T>(fn:()=>T){this.db.exec('BEGIN IMMEDIATE');try{const r=fn();this.db.exec('COMMIT');return r;}catch(e){this.db.exec('ROLLBACK');throw e;}}
+ create(row:ReleaseRow){return this.transaction(()=>{const old=this.byKey(row.tenant,row.customer,row.actor,row.key);if(old){if(old.digest!==row.digest)throw Error('request_conflict');return old;}this.db.prepare('INSERT INTO release_rows VALUES(?,?,?,?,?,?,?,?,?,?)').run(row.id,row.tenant,row.customer,row.actor,row.key,row.digest,row.payload,row.status,row.revision,row.expires);this.audit(row,'prepared');return row;});}
+ change(id:string,revision:number,status:'confirmed_local'|'revoked'){return this.transaction(()=>{const r=this.get(id);if(!r)throw Error('not_found');if(r.status===status)return r;if(r.revision!==revision)throw Error('revision_conflict');if(status==='confirmed_local'&&r.status!=='draft')throw Error('revoked');this.db.prepare('UPDATE release_rows SET status=?,revision=revision+1 WHERE id=? AND revision=?').run(status,id,revision);const next=this.get(id)!;this.audit(next,status==='revoked'?'revoked':'confirmed_local');return next;});}
+ history(id:string){return this.db.prepare('SELECT event,digest,previous,hash,recorded_at AS recordedAt FROM release_audit WHERE release_id=? ORDER BY seq').all(id);}
+ close(){this.db.close();}
+}

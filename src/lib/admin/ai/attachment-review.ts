@@ -24,7 +24,7 @@ export function canonicalAttachment(v:unknown):string{
  if(v&&typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonicalAttachment((v as Record<string,unknown>)[k])).join(',')+'}';
  throw Error('receipt_unverified');
 }
-export type RegisteredAttachmentProfile={policy:string;syntheticOnly:boolean;pin:AttachmentPin;minimize:(segments:Segment[],scope:Scope)=>Promise<Segment[]>};
+export type RegisteredAttachmentProfile={selectedFields?:string[];policy:string;syntheticOnly:boolean;pin:AttachmentPin;minimize:(segments:Segment[],scope:Scope)=>Promise<Segment[]>};
 function slot(raw:unknown,scope:Scope,profile?:RegisteredAttachmentProfile):Slot{
  if(!exact(raw,['pin','permit','reserved','sameSession','binding','usedAttempts','reservedMicrousd','expiresAt','receipt','receiptMac']))throw Error('repository_unavailable');
  const r=raw as Slot,p=r.pin;
@@ -101,6 +101,7 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts,p
    return respond(e);
   }
   if(action==='verify')throw Error('receipt_unverified');
+  if(action==='read'&&profile&&!initialSlot.reserved&&initialSlot.usedAttempts>=10)return Response.json({code:'budget_exhausted',financialApproval:false,automaticRetryAllowed:false},{status:429,headers});
   if(action==='read')return Response.json({state:Date.parse(initialSlot.expiresAt)<=(p.now?.()??Date.now())?'attachment_expired':p.env.OPENAI_API_KEY?'ready':'waiting_provider',syntheticOnly:profile?.syntheticOnly??true,financialApproval:false},{headers});
   if(!p.env.OPENAI_API_KEY)throw Error('provider_not_configured');
   if(Date.parse(initialSlot.expiresAt)<=(p.now?.()??Date.now()))throw Error('attachment_expired');
@@ -133,7 +134,7 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts,p
      if(profile)return profile.minimize(segments,scope);
      // One exact synthetic text page only. Extractor output is checked, never substituted with fixture text.
      if(segments.length!==1||segments[0].locator!=='page:1'||sha(segments[0].text)!==sha(smokeFixture.text))throw Error('synthetic_source_required');return segments;
-    },model:responsesTransport(boundedSyntheticTrial(p.env.OPENAI_API_KEY),transport),reserve:async()=>{
+    },model:responsesTransport({...boundedSyntheticTrial(p.env.OPENAI_API_KEY),...(profile?.selectedFields?{selectedFields:profile.selectedFields}:{})},transport),reserve:async()=>{
      await recheck();if(request.signal.aborted)throw Error('cancelled');cap=randomBytes(32).toString('hex');
      const reserved=slot(await p.rpc('reserve',ids[0],sha(cap)),scope,profile);if(!reserved.permit||!reserved.sameSession)throw Error('provider_outcome_unknown');initialSlot=reserved;observe('reserved');return true;
     }},ids,'attachment-single-v98',request.signal);

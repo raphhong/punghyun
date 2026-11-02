@@ -1,5 +1,5 @@
 import {sha,type Scope,type Segment} from './review';
-export type TextRelease={policyVersion:string;scopeHash:string;expiresAt:number;segments:{id:string;sourceId:string;version:string;sha256:string;assetId:string|null;textHash:string;ranges:{start:number;end:number}[]}[]};
+export type TextRelease={selectedFields?:string[];policyVersion:string;scopeHash:string;expiresAt:number;segments:{id:string;sourceId:string;version:string;sha256:string;assetId:string|null;textHash:string;ranges:{start:number;end:number}[]}[]};
 /** Server-owned release manifest, never accepted from HTTP/model output. Explicit ranges are
  * reviewed outside the model. Detection is defense in depth, not a complete PII classifier. */
 export function rangeMinimizer(release:TextRelease,now:()=>number=Date.now){
