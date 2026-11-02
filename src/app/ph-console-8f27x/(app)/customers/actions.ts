@@ -83,7 +83,9 @@ export async function createCustomer(formData: FormData) {
 
   if (error) throw new Error(error.message);
   refresh(data.id);
-  redirect(adminPath(`customers/${data.id}`));
+  const bizmarket=String(formData.get('bizmarket_profile')??'none');
+  const next=['hospital','manufacturing','medical_corporation'].includes(bizmarket)?`?bizmarket_profile=${encodeURIComponent(bizmarket)}`:'';
+  redirect(adminPath(`customers/${data.id}`)+next);
 }
 
 // ── 기본 정보 업데이트 ───────────────────────────

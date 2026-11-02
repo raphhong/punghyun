@@ -1,3 +1,4 @@
+import {profileLabels} from '@/lib/admin/bizmarket/catalog';
 import Link from "next/link";
 import { adminPath } from "@/lib/admin/config";
 import { HOSPITAL_TYPES } from "@/lib/admin/pipeline";
@@ -32,6 +33,7 @@ export default function NewCustomerPage() {
         action={createCustomer}
         className="space-y-5 rounded-2xl border border-navy-100 bg-white p-6"
       >
+        <label className={labelCls}>비즈마켓 자료 유형 (선택)<select name="bizmarket_profile" className={inputCls} defaultValue="none">{Object.entries(profileLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><span className="block text-xs">고객 등록 후 전용 자료 입력을 이어갑니다. 다른 고객·NICE 요건에는 적용하지 않습니다.</span></label>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="hospital_name" className={labelCls}>

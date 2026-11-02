@@ -21,8 +21,10 @@ export function actorSources(db:SupabaseClient,tenantId:string,customerId:string
   try{
    if(!Array.isArray(ids)||ids.length<1||ids.length>8||new Set(ids).size!==ids.length)throw Error('source_changed');
    if(JSON.stringify(await scope())!==JSON.stringify(expected))throw Error('context_changed');
-   const rows=await db.from('customer_documents').select('id,customer_id,device_id,file_path,uploaded_at').eq('customer_id',customerId).in('id',ids);
+   const rows=await db.from('customer_documents').select('id,customer_id,device_id,file_path,uploaded_at,doc_key').eq('customer_id',customerId).in('id',ids);
    if(rows.error||!rows.data||rows.data.length!==ids.length)throw Error('source_changed');
+   if(rows.data.some(row=>['rep_id','representative_id','resident_register','resident_registration','id_card','business_bank_copy'].includes(row.doc_key)))throw Error('source_unavailable');
+   const sensitivity=await db.rpc('admin_bizmarket_intake_v1',{p_customer:customerId,p_action:'ai_source_allowed',p_data:{ids}});if(sensitivity.error||sensitivity.data?.allowed!==true)throw Error('source_unavailable');
    const result:Source[]=[];
    for(const row of rows.data){
     if(!ids.includes(row.id)||row.customer_id!==customerId||typeof row.file_path!=='string'||!row.file_path||!row.uploaded_at)throw Error('source_changed');
@@ -33,6 +35,7 @@ export function actorSources(db:SupabaseClient,tenantId:string,customerId:string
     result.push({id:row.id,version:sourceVersion(row.uploaded_at,sha(row.file_path),hash),sha256:hash,bytes,customerId,assetId:row.device_id??null,mime:blob.data.type});
    }
    if(JSON.stringify(await scope())!==JSON.stringify(expected))throw Error('context_changed');
+   const latestSensitivity=await db.rpc('admin_bizmarket_intake_v1',{p_customer:customerId,p_action:'ai_source_allowed',p_data:{ids}});if(latestSensitivity.error||latestSensitivity.data?.allowed!==true)throw Error('source_unavailable');
    return result;
   }catch(e){throw Error(e instanceof Error&&['forbidden','context_changed','source_changed'].includes(e.message)?e.message:'source_unavailable');}
  }};

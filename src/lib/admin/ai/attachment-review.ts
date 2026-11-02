@@ -8,7 +8,8 @@ import {smokeEnvironment,smokeFixture} from './synthetic-smoke';
 
 export const attachmentPolicy='synthetic-attachment-v98';
 export type AttachmentPin={tenantId:string;customerId:string;documentId:string;assetId:string|null;uploadedAt:string;pathHash:string;bytesHash:string;objectSnapshot:string};
-type Slot={pin:AttachmentPin;permit:boolean;reserved:boolean;sameSession:boolean;binding:string|null;usedAttempts:number;reservedMicrousd:number;expiresAt:string;receipt:unknown;receiptMac:string|null};
+export type BudgetPolicy={id:string;revision:number;maxAttempts:number;maxMicrousd:number};
+type Slot={budget?:BudgetPolicy;receiptReadable?:boolean;pin:AttachmentPin;permit:boolean;reserved:boolean;sameSession:boolean;binding:string|null;usedAttempts:number;reservedMicrousd:number;expiresAt:string;receipt:unknown;receiptMac:string|null};
 type Usage={inputTokens:number;outputTokens:number;cachedInputTokens:number;conservativeCostUsd:number};
 type Envelope={policy:string;parser:string;codeBinding:string;actorHash:string;binding:string;pinHash:string;sourceSnapshot:string;outcome:'needs_review'|'provider_outcome_unknown';result:Result|null;usage:Usage|null};
 export type AttachmentDiagnostic={stage:'start'|'source_verified'|'parse_start'|'parse_complete'|'reserved'|'dispatch_start'|'provider_headers'|'provider_usage'|'finish_start'|'finished'|'failure';elapsedMs:number;code?:string;httpStatus?:number;usage?:Usage};
@@ -24,12 +25,12 @@ export function canonicalAttachment(v:unknown):string{
  if(v&&typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonicalAttachment((v as Record<string,unknown>)[k])).join(',')+'}';
  throw Error('receipt_unverified');
 }
-export type RegisteredAttachmentProfile={selectedFields?:string[];policy:string;syntheticOnly:boolean;pin:AttachmentPin;minimize:(segments:Segment[],scope:Scope)=>Promise<Segment[]>};
+export type RegisteredAttachmentProfile={selectedFields?:string[];policy:string;syntheticOnly:boolean;budget?:BudgetPolicy;pin:AttachmentPin;minimize:(segments:Segment[],scope:Scope)=>Promise<Segment[]>};
 function slot(raw:unknown,scope:Scope,profile?:RegisteredAttachmentProfile):Slot{
- if(!exact(raw,['pin','permit','reserved','sameSession','binding','usedAttempts','reservedMicrousd','expiresAt','receipt','receiptMac']))throw Error('repository_unavailable');
+ if(!exact(raw,['pin','permit','reserved','sameSession','binding','usedAttempts','reservedMicrousd','expiresAt','receipt','receiptMac',...(profile?.budget?['budget','receiptReadable']:[])]))throw Error('repository_unavailable');
  const r=raw as Slot,p=r.pin;
  if(!exact(p,['tenantId','customerId','documentId','assetId','uploadedAt','pathHash','bytesHash','objectSnapshot'])||p.tenantId!=='zatlumldeqhghhrsgtdq'||p.tenantId!==scope.tenantId||p.customerId!==scope.customerId||!uuid(p.documentId)||p.assetId!==null&&!uuid(p.assetId)||!Number.isFinite(Date.parse(p.uploadedAt))||!hex(p.pathHash)||!hex(p.objectSnapshot)||(!hex(p.bytesHash)||(!profile&&p.bytesHash!==smokeFixture.pdfHash)))throw Error('synthetic_source_required');
- if(typeof r.permit!=='boolean'||typeof r.reserved!=='boolean'||typeof r.sameSession!=='boolean'||!Number.isFinite(Date.parse(r.expiresAt))||(profile?(![9,10].includes(r.usedAttempts)||r.reservedMicrousd!==4215360+(r.usedAttempts-9)*500000):(r.usedAttempts!==(r.reserved?9:8)||r.reservedMicrousd!==(r.reserved?4215360:3715360)))||r.permit&&(!r.reserved||!r.sameSession)||r.sameSession&&(!r.reserved||!hex(r.binding)))throw Error('repository_unavailable');
+ if(typeof r.permit!=='boolean'||typeof r.reserved!=='boolean'||typeof r.sameSession!=='boolean'||!Number.isFinite(Date.parse(r.expiresAt))||(profile?.budget?(!Number.isSafeInteger(r.usedAttempts)||r.usedAttempts<0||!Number.isSafeInteger(r.reservedMicrousd)||r.reservedMicrousd<0||canonicalAttachment(r.budget)!==canonicalAttachment(profile.budget)||typeof r.receiptReadable!=='boolean'||r.receiptReadable&&(!r.reserved||!hex(r.binding))):(profile?((r.reserved?r.usedAttempts<9:![9,10].includes(r.usedAttempts))||r.reservedMicrousd!==4215360+(r.usedAttempts-9)*500000):(r.usedAttempts!==(r.reserved?9:8)||r.reservedMicrousd!==(r.reserved?4215360:3715360))))||r.permit&&(!r.reserved||!r.sameSession)||r.sameSession&&(!r.reserved||!hex(r.binding)))throw Error('repository_unavailable');
  if(profile&&canonicalAttachment(p)!==canonicalAttachment(profile.pin))throw Error('source_changed');
  return r;
 }
@@ -72,7 +73,7 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts,p
   let verifiedReceiptSnapshot:string|null=null;
   const currentSources=async()=>{
    const current=await read();if(sha(canonicalAttachment(current.pin))!==pinHash)throw Error('source_changed');
-   if(initialSlot?.reserved&&(!current.sameSession||current.binding!==initialSlot.binding))throw Error('context_changed');
+   if(initialSlot?.reserved&&(!(current.sameSession||profile?.budget&&current.receiptReadable)||current.binding!==initialSlot.binding))throw Error('context_changed');
    if(verifiedReceiptSnapshot&&sha(canonicalAttachment([current.receipt,current.receiptMac]))!==verifiedReceiptSnapshot)throw Error('receipt_unverified');
    const values=await p.sources(ids,scope),pin=current.pin;
    if(values.length!==1)throw Error('source_changed');const s=values[0];
@@ -83,7 +84,7 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts,p
   const recheck=async()=>{if(reviewSourceSnapshot(scope,await currentSources())!==snapshot)throw Error('source_changed');};
   const verified=(r:Slot):Envelope|null=>{
    try{
-    if(!p.env.OPENAI_API_KEY||!r.sameSession||!hex(r.receiptMac)||!exact(r.receipt,['policy','parser','codeBinding','actorHash','binding','pinHash','sourceSnapshot','outcome','result','usage']))return null;
+    if(!p.env.OPENAI_API_KEY||!(r.sameSession||profile?.budget&&r.receiptReadable)||!hex(r.receiptMac)||!exact(r.receipt,['policy','parser','codeBinding','actorHash','binding','pinHash','sourceSnapshot','outcome','result','usage']))return null;
     const e=r.receipt as Envelope;
     if(e.policy!==policy||e.parser!==pdfParserVersion||(e.codeBinding!==codeBinding&&e.codeBinding!==verifiedPredecessor)||e.actorHash!==sha(scope.actorId)||e.binding!==r.binding||e.pinHash!==pinHash||e.sourceSnapshot!==snapshot||!['needs_review','provider_outcome_unknown'].includes(e.outcome)||Buffer.byteLength(canonicalAttachment(e))>32000)return null;
     if(!timingSafeEqual(Buffer.from(r.receiptMac,'hex'),Buffer.from(mac(p.env.OPENAI_API_KEY,e),'hex')))return null;
@@ -101,7 +102,7 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts,p
    return respond(e);
   }
   if(action==='verify')throw Error('receipt_unverified');
-  if(action==='read'&&profile&&!initialSlot.reserved&&initialSlot.usedAttempts>=10)return Response.json({code:'budget_exhausted',financialApproval:false,automaticRetryAllowed:false},{status:429,headers});
+  if(action==='read'&&profile&&!initialSlot.reserved&&(initialSlot.usedAttempts>=(profile.budget?.maxAttempts??10)||!!profile.budget&&initialSlot.reservedMicrousd+500000>profile.budget.maxMicrousd))return Response.json({code:'budget_exhausted',financialApproval:false,automaticRetryAllowed:false},{status:429,headers});
   if(action==='read')return Response.json({state:Date.parse(initialSlot.expiresAt)<=(p.now?.()??Date.now())?'attachment_expired':p.env.OPENAI_API_KEY?'ready':'waiting_provider',syntheticOnly:profile?.syntheticOnly??true,financialApproval:false},{headers});
   if(!p.env.OPENAI_API_KEY)throw Error('provider_not_configured');
   if(Date.parse(initialSlot.expiresAt)<=(p.now?.()??Date.now()))throw Error('attachment_expired');

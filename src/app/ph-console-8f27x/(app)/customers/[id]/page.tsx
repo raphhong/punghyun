@@ -1,3 +1,5 @@
+import BizmarketIntakePanel from '@/components/admin/bizmarket/BizmarketIntakePanel';
+import {profileLabels,type Profile} from '@/lib/admin/bizmarket/catalog';
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -83,11 +85,12 @@ function Check({
 }
 
 export default async function CustomerDetailPage({
-  params,
+  params,searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string }>;searchParams:Promise<Record<string,string|string[]|undefined>>;
 }) {
   const { id } = await params;
+  const search=await searchParams;const requested=search?.bizmarket_profile;const initialProfile=typeof requested==='string'&&Object.hasOwn(profileLabels,requested)?requested as Profile:undefined;
   const supabase = await createClient();
 
   // 세 쿼리 모두 route param(id)에만 의존 → 병렬 실행으로 왕복 절감.
@@ -149,19 +152,20 @@ export default async function CustomerDetailPage({
     ].map((d) => [d.key, d.label]),
   );
   let photoNo = 0;
-  const galleryItems: GalleryItem[] = docs
-    .map((row) => {
-      const url = row.file_path ? signedMap.get(row.file_path) : undefined;
-      if (!row.file_path || !url) return null;
-      const ext = (row.file_path.split(".").pop() ?? "").toLowerCase();
-      const label = row.doc_key.startsWith("device_photo_")
-        ? `기기 사진 ${(photoNo += 1)}`
-        : isOtherDocument(row.doc_key)
-          ? `기타 서류 · ${otherDocumentFilename(row.file_path)}`
-          : (docLabelMap.get(row.doc_key) ?? row.doc_key);
-      return { key: row.doc_key, label, url, isImage: IMG_EXT.has(ext) };
-    })
-    .filter((x): x is GalleryItem => x !== null);
+  const galleryItems: GalleryItem[] = [];
+  for (const row of docs) {
+    const url = row.file_path ? signedMap.get(row.file_path) : undefined;
+    if (!row.file_path || !url) continue;
+    const ext = (row.file_path.split(".").pop() ?? "").toLowerCase();
+    const isDevicePhoto = row.doc_key.startsWith("device_photo_");
+    if (isDevicePhoto) photoNo += 1;
+    const label = isDevicePhoto
+      ? `기기 사진 ${photoNo}`
+      : isOtherDocument(row.doc_key)
+        ? `기타 서류 · ${otherDocumentFilename(row.file_path)}`
+        : (docLabelMap.get(row.doc_key) ?? row.doc_key);
+    galleryItems.push({ key: row.doc_key, label, url, isImage: IMG_EXT.has(ext) });
+  }
 
   // 기기별 사진 그룹핑 (device_id 기준) + 기기 목록
   const photosByDevice = new Map<string, { key: string; url: string }[]>();
@@ -237,6 +241,7 @@ ${docLines}
 
   return (
     <div className="space-y-6">
+      <details open={!!initialProfile}><summary className="cursor-pointer font-semibold">비즈마켓 자료 접수</summary><BizmarketIntakePanel customerId={id} initialProfile={initialProfile}/></details>
       {/* 헤더 */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
