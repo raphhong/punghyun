@@ -12,8 +12,7 @@ export function actorSources(db:SupabaseClient,tenantId:string,customerId:string
  async function scope():Promise<Scope>{
   try{
    const auth=await db.auth.getUser();if(auth.error||!auth.data.user)throw Error('forbidden');
-   const admin=await db.from('admins').select('user_id').eq('user_id',auth.data.user.id).maybeSingle();
-   const customer=await db.from('customers').select('id').eq('id',customerId).maybeSingle();
+   const [admin,customer]=await Promise.all([db.from('admins').select('user_id').eq('user_id',auth.data.user.id).maybeSingle(),db.from('customers').select('id').eq('id',customerId).maybeSingle()]);
    if(admin.error||!admin.data||customer.error||!customer.data)throw Error('forbidden');
    return {actorId:auth.data.user.id,tenantId,customerId,caseId,revision:sha(JSON.stringify([auth.data.user.id,tenantId,customerId,caseId]))};
   }catch{throw Error('forbidden');}

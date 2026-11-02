@@ -62,18 +62,18 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
   if(ids.length!==1||!uuid(ids[0]))throw Error('invalid_request');
   initial=await p.scope();const scope=initial;
   const currentScope=async()=>{const now=await p.scope();if(canonicalAttachment(now)!==canonicalAttachment(scope))throw Error('context_changed');return now;};
-  const read=async()=>{await currentScope();const r=slot(await p.rpc('read',ids[0]),scope);if(r.pin.documentId!==ids[0])throw Error('synthetic_source_required');await currentScope();return r;};
+  const read=async()=>{const r=slot(await p.rpc('read',ids[0]),scope);if(r.pin.documentId!==ids[0])throw Error('synthetic_source_required');await currentScope();return r;};
   initialSlot=await read();
   const pinHash=sha(canonicalAttachment(initialSlot.pin));
   let verifiedReceiptSnapshot:string|null=null;
   const currentSources=async()=>{
-   await currentScope();const current=await read();if(sha(canonicalAttachment(current.pin))!==pinHash)throw Error('source_changed');
+   const current=await read();if(sha(canonicalAttachment(current.pin))!==pinHash)throw Error('source_changed');
    if(initialSlot?.reserved&&(!current.sameSession||current.binding!==initialSlot.binding))throw Error('context_changed');
    if(verifiedReceiptSnapshot&&sha(canonicalAttachment([current.receipt,current.receiptMac]))!==verifiedReceiptSnapshot)throw Error('receipt_unverified');
    const values=await p.sources(ids,scope),pin=current.pin;
    if(values.length!==1)throw Error('source_changed');const s=values[0];
    if(s.id!==pin.documentId||s.customerId!==pin.customerId||s.assetId!==pin.assetId||s.sha256!==pin.bytesHash||sha(s.bytes)!==pin.bytesHash||s.version!==sourceVersion(pin.uploadedAt,pin.pathHash,pin.bytesHash)||s.mime.split(';')[0]!=='application/pdf')throw Error('source_changed');
-   await currentScope();return values;
+   return values;
   };
   const sources=await currentSources();observe('source_verified');sourceSnapshot=reviewSourceSnapshot(scope,sources);const snapshot=sourceSnapshot;
   const recheck=async()=>{if(reviewSourceSnapshot(scope,await currentSources())!==snapshot)throw Error('source_changed');};
@@ -103,7 +103,9 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
   let dispatches=0;
   const transport:typeof fetch=async(url,options)=>{
    if(dispatches++||request.signal.aborted)throw Error('provider_outcome_unknown');
-   await recheck();const current=await read();if(!current.sameSession||current.binding!==initialSlot?.binding)throw Error('forbidden');
+   // runReview's beforeDispatch just completed the fresh bytes/scope/slot check.
+   // No await or externally supplied callback occurs between that check and this transport.
+   if(!initialSlot?.sameSession||!initialSlot.binding)throw Error('forbidden');
    if(options?.signal?.aborted||request.signal.aborted)throw Error('provider_outcome_unknown');
    observe('dispatch_start');const response=await(p.transport??fetch)(url,options);observe('provider_headers',{httpStatus:response.status});
    if(!response.ok){await response.body?.cancel();throw Error('provider_outcome_unknown');}
@@ -121,7 +123,8 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
    await recheck();const latest=await read(),confirmed=verified(latest);if(!confirmed)throw Error('receipt_unverified');await recheck();observe('finished');return confirmed;
   };
   try{
-   const result=await runReview({policyVersion:attachmentPolicy+':'+pdfParserVersion,scope:currentScope,sources:currentSources,
+   let initialSourcesAvailable=true;
+   const result=await runReview({policyVersion:attachmentPolicy+':'+pdfParserVersion,scope:async()=>scope,sources:async()=>{if(initialSourcesAvailable){initialSourcesAvailable=false;return sources;}return currentSources();},
     extract:async s=>{observe('parse_start');const parsed=await p.extract(s,request.signal);observe('parse_complete');return parsed;},minimize:async segments=>{
      // One exact synthetic text page only. Extractor output is checked, never substituted with fixture text.
      if(segments.length!==1||segments[0].locator!=='page:1'||sha(segments[0].text)!==sha(smokeFixture.text))throw Error('synthetic_source_required');return segments;
