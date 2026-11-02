@@ -1,3 +1,4 @@
+import SalesReviewPanel from '@/components/sales/SalesReviewPanel';
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
@@ -132,6 +133,7 @@ ${docLines}
 
   return (
     <div className="space-y-6">
+      {agent?.status === 'approved' && customer.sales_agent_id === agent.id && <SalesReviewPanel customerId={id} documents={docs.filter(d=>d.file_path&&d.uploaded_at).map(d=>({id:d.id,version:JSON.stringify([d.uploaded_at,d.file_path]),label:otherDocumentFilename(d.file_path!)}))}/>}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">

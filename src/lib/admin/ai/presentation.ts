@@ -3,6 +3,7 @@ const text=(x:unknown,max=4000):x is string=>typeof x==='string'&&x.length<=max;
 export function readReviewResult(value:unknown):Result{
  if(!value||typeof value!=='object')throw Error('invalid_review');const r=value as Result;
  if(r.status!=='needs_review'||!['mock','live','not_run'].includes(r.mode)||r.financialApproval!==false||!Array.isArray(r.facts)||r.facts.length>100||!Array.isArray(r.supplements)||r.supplements.length>500)throw Error('invalid_review');
+ if(r.extraction!==undefined&&(!r.extraction||!['ocr','xlsx','vision'].includes(r.extraction.kind)||r.extraction.reviewRequired!==true||!text(r.extraction.parserVersion,200)||!Array.isArray(r.extraction.warnings)||r.extraction.warnings.length>30||r.extraction.warnings.some(w=>!text(w,100))))throw Error('invalid_review');
  if(r.mode==='not_run'&&r.facts.length)throw Error('invalid_review');
  for(const f of r.facts)if(!f||typeof f!=='object'||!['field','value','quote','segment','unit','vat','period','sourceId','version','sha256','locator'].every(k=>text((f as unknown as Record<string,unknown>)[k]))||!f.sourceId||!f.version||!f.locator||!f.quote||!f.value||!/^[a-f0-9]{64}$/.test(f.sha256)||(f.assetId!==null&&!text(f.assetId,200)))throw Error('invalid_review');
  for(const s of r.supplements)if(!s||!['unknown','unreadable','conflict'].includes(s.kind)||!text(s.sourceId,200)||!text(s.field,200))throw Error('invalid_review');
@@ -33,3 +34,5 @@ export function readRequirementNotices(raw:unknown,snapshot:string|undefined):Re
  return p.items;
 }
 export function requirementMessage(r:RequirementNotice){return ({not_required:'이번 거래의 필수 자료가 아닙니다.',applicability_unknown:'이 거래에 필요한 자료인지 풍현에서 확인합니다.',present_needs_review:'이미 제출한 자료입니다. 내용을 확인합니다.',unreadable:'읽기 어려운 자료입니다. 풍현에서 원문을 확인합니다.',inventory_unknown:'자료 목록을 아직 확인하지 못했습니다. 다시 제출하지 않아도 됩니다.',missing_confirmed:'필수 자료가 확인되지 않았습니다. 담당자가 자료를 확보합니다.'} as Record<string,string>)[r.state];}
+
+export function sourceLocatorLabel(locator:string){const m=/^sheet:([1-9][0-9]*);name:([^;]+);cell:([A-Z]+[1-9][0-9]*);part:value$/.exec(locator);if(!m)return locator;try{return '시트 '+m[1]+' · '+decodeURIComponent(m[2])+' · 셀 '+m[3];}catch{return locator;}}
