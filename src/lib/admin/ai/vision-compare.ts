@@ -45,13 +45,16 @@ export function prepareVisionBatch(a:Authority,selected:Source[],now:number){
  const binding=hash(stable({policy:POLICY,actor:a.actorId,customer:a.customerId,revision:a.revision,expiresAt:a.expiresAt,images:sources.map(pin),requestHash:hash(json)}));
  return {json,binding,sources,imageTokens,inputTokenAllowance,maxEstimatedMicrousd,requestHash:hash(json)};
 }
+export const FAILURE_CODES=['response_object','response_status','response_model','response_output','vision_usage','message_shape','content_json','reading_schema','duplicate_field','empty_readable','quote_mismatch','box_shape','box_bounds','nonreadable_payload','vision_source_changed','vision_budget_observed','provider_http','provider_sensitive_response','provider_json','provider_body_limit','result_storage_limit','unclassified'] as const;
+export type Failure={stage:'pre_send_authority'|'provider'|'parse'|'post_response_authority'|'budget';code:typeof FAILURE_CODES[number]};
+export function safeFailure(stage:Failure['stage'],e:unknown):Failure{return {stage,code:e instanceof Error&&FAILURE_CODES.includes(e.message as Failure['code'])?e.message as Failure['code']:'unclassified'};}
 export function parseVisionResponse(raw:unknown,sources:ImagePin[]):Observation{
- if(!rec(raw)||raw.status!=='completed'||raw.model!==MODEL||!Array.isArray(raw.output)||!rec(raw.usage))throw Error('vision_response_schema');
+ if(!rec(raw))throw Error('response_object');if(raw.status!=='completed')throw Error('response_status');if(raw.model!==MODEL)throw Error('response_model');if(!Array.isArray(raw.output))throw Error('response_output');if(!rec(raw.usage))throw Error('vision_usage');
  const u=raw.usage;if(!integer(u.input_tokens,0,100000)||!integer(u.output_tokens,0,LIMITS.maxOutputTokens)||!integer(u.total_tokens,0,104000)||Number(u.total_tokens)!==Number(u.input_tokens)+Number(u.output_tokens))throw Error('vision_usage');
- const messages=raw.output.filter(m=>rec(m)&&m.type==='message');if(messages.length!==1||!rec(messages[0])||!Array.isArray(messages[0].content)||messages[0].content.length!==1)throw Error('vision_response_schema');const c=messages[0].content[0];if(!rec(c)||c.type!=='output_text'||typeof c.text!=='string'||c.text.length>100000)throw Error('vision_response_schema');
- let r:unknown;try{r=JSON.parse(c.text);}catch{throw Error('vision_response_schema');}if(!exact(r,['readings'])||!Array.isArray(r.readings)||r.readings.length>48)throw Error('vision_response_schema');
- const seen=new Set<string>();const readings=r.readings.map((v:unknown)=>{if(!exact(v,['imageId','field','raw','quote','box','status','unit','vat','period']))throw Error('vision_response_schema');const p=sources.find(s=>s.id===v.imageId);if(!p||!fields.includes(v.field as typeof fields[number])||!['readable','unreadable','absent'].includes(String(v.status)))throw Error('vision_response_schema');for(const k of ['raw','quote','unit','vat','period'])if(typeof v[k]!=='string'||(v[k] as string).length>1000)throw Error('vision_response_schema');const key=v.imageId+':'+v.field;if(seen.has(key))throw Error('vision_response_schema');seen.add(key);
- if(v.status==='readable'){if(!(v.raw as string).length||!(v.quote as string).includes(v.raw as string)||!Array.isArray(v.box)||v.box.length!==4||!v.box.every(n=>integer(n,0,6000))||v.box[2]<1||v.box[3]<1||v.box[0]+v.box[2]>p.width||v.box[1]+v.box[3]>p.height)throw Error('vision_evidence_claim');}else if(v.raw!==''||v.quote!==''||v.box!==null)throw Error('vision_evidence_claim');return v as unknown as Reading;});
+ const messages=raw.output.filter(m=>rec(m)&&m.type==='message');if(messages.length!==1||!rec(messages[0])||!Array.isArray(messages[0].content)||messages[0].content.length!==1)throw Error('message_shape');const c=messages[0].content[0];if(!rec(c)||c.type!=='output_text'||typeof c.text!=='string'||c.text.length>100000)throw Error('message_shape');
+ let r:unknown;try{r=JSON.parse(c.text);}catch{throw Error('content_json');}if(!exact(r,['readings'])||!Array.isArray(r.readings)||r.readings.length>48)throw Error('reading_schema');
+ const seen=new Set<string>();const readings=r.readings.map((v:unknown)=>{if(!exact(v,['imageId','field','raw','quote','box','status','unit','vat','period']))throw Error('reading_schema');const p=sources.find(s=>s.id===v.imageId);if(!p||!fields.includes(v.field as typeof fields[number])||!['readable','unreadable','absent'].includes(String(v.status)))throw Error('reading_schema');for(const k of ['raw','quote','unit','vat','period'])if(typeof v[k]!=='string'||(v[k] as string).length>1000)throw Error('reading_schema');const key=v.imageId+':'+v.field;if(seen.has(key))throw Error('duplicate_field');seen.add(key);
+ if(v.status==='readable'){if(!(v.raw as string).length)throw Error('empty_readable');if(!(v.quote as string).includes(v.raw as string))throw Error('quote_mismatch');if(!Array.isArray(v.box)||v.box.length!==4||!v.box.every(n=>integer(n,0,6000))||v.box[2]<1||v.box[3]<1)throw Error('box_shape');if(v.box[0]+v.box[2]>p.width||v.box[1]+v.box[3]>p.height)throw Error('box_bounds');}else if(v.raw!==''||v.quote!==''||v.box!==null)throw Error('nonreadable_payload');return v as unknown as Reading;});
  return {readings,usage:{inputTokens:Number(u.input_tokens),outputTokens:Number(u.output_tokens),estimatedMicrousd:Math.ceil(Number(u.input_tokens)*2.5+Number(u.output_tokens)*15)},verified:false,applyAllowed:false};
 }
 export type LedgerPorts={
@@ -62,23 +65,23 @@ export type LedgerPorts={
  reserve:(slot:string,binding:string,reserveMicrousd:number)=>Promise<{permit:boolean;binding:string}>;
  /** Existing server OpenAI transport supplied explicitly; no defaultfetch or key in this adapter. */
  send:(json:string,signal:AbortSignal)=>Promise<unknown>;
- finish:(slot:string,binding:string,outcome:'observed'|'unknown',result:Observation|null,usage?:Usage)=>Promise<void>;
+ finish:(slot:string,binding:string,outcome:'observed'|'unknown',result:Observation|null,usage?:Usage,failure?:Failure)=>Promise<void>;
  now:()=>number;
 };
 export async function runVisionComparison(p:LedgerPorts,slot:string,images:Source[],signal:AbortSignal){
  if(!/^vision-v118-[1-5]$/.test(slot)||signal.aborted)throw Error('vision_not_authorized');
  const a=await p.authority(),request=prepareVisionBatch(a,images,p.now());
  const ack=await p.reserve(slot,request.binding,LIMITS.reserveMicrousd);if(ack?.permit!==true||ack.binding!==request.binding)throw Error('vision_already_reserved');
- let result:Observation|null=null;let finishStarted=false;let usage:Usage|undefined;
+ let result:Observation|null=null;let finishStarted=false;let usage:Usage|undefined;let stage:Failure['stage']='pre_send_authority';
  try{
   if(signal.aborted||prepareVisionBatch(await p.authority(),images,p.now()).binding!==request.binding)throw Error('vision_source_changed');
-  const raw=await p.send(request.json,signal);
+  stage='provider';const raw=await p.send(request.json,signal);
   if(rec(raw)&&rec(raw.usage)&&integer(raw.usage.input_tokens,0,100000)&&integer(raw.usage.output_tokens,0,4000)&&raw.usage.total_tokens===Number(raw.usage.input_tokens)+Number(raw.usage.output_tokens))usage={inputTokens:Number(raw.usage.input_tokens),outputTokens:Number(raw.usage.output_tokens),estimatedMicrousd:Math.ceil(Number(raw.usage.input_tokens)*2.5+Number(raw.usage.output_tokens)*15)};
-  result=parseVisionResponse(raw,request.sources);
+  stage='parse';result=parseVisionResponse(raw,request.sources);stage='post_response_authority';
   if(signal.aborted||prepareVisionBatch(await p.authority(),images,p.now()).binding!==request.binding)throw Error('vision_source_changed');
-  if(result.usage.estimatedMicrousd>LIMITS.reserveMicrousd||result.usage.inputTokens>request.inputTokenAllowance)throw Error('vision_budget_observed');
+  stage='budget';if(result.usage.estimatedMicrousd>LIMITS.reserveMicrousd||result.usage.inputTokens>request.inputTokenAllowance)throw Error('vision_budget_observed');
   finishStarted=true;await p.finish(slot,request.binding,'observed',result,usage);
   if(signal.aborted||prepareVisionBatch(await p.authority(),images,p.now()).binding!==request.binding)throw Error('vision_source_changed');
   return result;
- }catch{if(!finishStarted)await p.finish(slot,request.binding,'unknown',null,usage);throw Error('vision_result_unconfirmed');}
+ }catch(e){if(!finishStarted)await p.finish(slot,request.binding,'unknown',null,usage,safeFailure(stage,e));throw Error('vision_result_unconfirmed');}
 }
