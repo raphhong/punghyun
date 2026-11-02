@@ -11,7 +11,8 @@ export type AttachmentPin={tenantId:string;customerId:string;documentId:string;a
 type Slot={pin:AttachmentPin;permit:boolean;reserved:boolean;sameSession:boolean;binding:string|null;usedAttempts:number;reservedMicrousd:number;expiresAt:string;receipt:unknown;receiptMac:string|null};
 type Usage={inputTokens:number;outputTokens:number;cachedInputTokens:number;conservativeCostUsd:number};
 type Envelope={policy:string;parser:string;codeBinding:string;actorHash:string;binding:string;pinHash:string;sourceSnapshot:string;outcome:'needs_review'|'provider_outcome_unknown';result:Result|null;usage:Usage|null};
-export type AttachmentPorts={env:Record<string,string|undefined>;scope():Promise<Scope>;sources(ids:string[],scope:Scope):Promise<Source[]>;extract(s:Source,signal:AbortSignal):Promise<Segment[]>;rpc(action:'read'|'reserve'|'finish',documentId:string,cap?:string,receipt?:unknown,mac?:string):Promise<unknown>;transport?:typeof fetch;now?:()=>number};
+export type AttachmentDiagnostic={stage:'start'|'source_verified'|'parse_start'|'parse_complete'|'reserved'|'dispatch_start'|'provider_headers'|'provider_usage'|'finish_start'|'finished'|'failure';elapsedMs:number;code?:string;httpStatus?:number;usage?:Usage};
+export type AttachmentPorts={env:Record<string,string|undefined>;scope():Promise<Scope>;sources(ids:string[],scope:Scope):Promise<Source[]>;extract(s:Source,signal:AbortSignal):Promise<Segment[]>;rpc(action:'read'|'reserve'|'finish',documentId:string,cap?:string,receipt?:unknown,mac?:string):Promise<unknown>;transport?:typeof fetch;now?:()=>number;observe?:(event:AttachmentDiagnostic)=>void};
 const codes=['forbidden','unauthorized','invalid_request','source_changed','context_changed','source_unavailable','source_unreadable','synthetic_source_required','attachment_not_configured','provider_not_configured','provider_outcome_unknown','receipt_unverified','budget_exhausted','attachment_expired','repository_unavailable','cancelled'];
 const safe=(e:unknown)=>e instanceof Error&&codes.includes(e.message)?e.message:'repository_unavailable';
 const hex=(s:unknown):s is string=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s);
@@ -42,6 +43,7 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
  const headers={'Cache-Control':'no-store','Pragma':'no-cache'};
  let cap:string|null=null,initial:Scope|null=null,initialSlot:Slot|null=null,sourceSnapshot:string|null=null;
  let observedUsage:Usage|null=null;
+ const started=Date.now();const observe=(stage:AttachmentDiagnostic['stage'],extra:Pick<AttachmentDiagnostic,'code'|'httpStatus'|'usage'>={})=>{try{p.observe?.({stage,elapsedMs:Date.now()-started,...extra});}catch{/* Diagnostics never authorize or change the operation. */}};observe('start');
  const codeBinding=sha([p.env.VERCEL_PROJECT_ID,p.env.VERCEL_GIT_COMMIT_REF,p.env.VERCEL_GIT_COMMIT_SHA,attachmentPolicy].join(':'));
  try{
   if(!smokeEnvironment(p.env))throw Error('attachment_not_configured');
@@ -73,7 +75,7 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
    if(s.id!==pin.documentId||s.customerId!==pin.customerId||s.assetId!==pin.assetId||s.sha256!==pin.bytesHash||sha(s.bytes)!==pin.bytesHash||s.version!==sourceVersion(pin.uploadedAt,pin.pathHash,pin.bytesHash)||s.mime.split(';')[0]!=='application/pdf')throw Error('source_changed');
    await currentScope();return values;
   };
-  const sources=await currentSources();sourceSnapshot=reviewSourceSnapshot(scope,sources);const snapshot=sourceSnapshot;
+  const sources=await currentSources();observe('source_verified');sourceSnapshot=reviewSourceSnapshot(scope,sources);const snapshot=sourceSnapshot;
   const recheck=async()=>{if(reviewSourceSnapshot(scope,await currentSources())!==snapshot)throw Error('source_changed');};
   const verified=(r:Slot):Envelope|null=>{
    try{
@@ -102,29 +104,30 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
   const transport:typeof fetch=async(url,options)=>{
    if(dispatches++||request.signal.aborted)throw Error('provider_outcome_unknown');
    await recheck();const current=await read();if(!current.sameSession||current.binding!==initialSlot?.binding)throw Error('forbidden');
-   const response=await(p.transport??fetch)(url,options);
+   if(options?.signal?.aborted||request.signal.aborted)throw Error('provider_outcome_unknown');
+   observe('dispatch_start');const response=await(p.transport??fetch)(url,options);observe('provider_headers',{httpStatus:response.status});
    if(!response.ok){await response.body?.cancel();throw Error('provider_outcome_unknown');}
    const reader=response.body?.getReader();if(!reader)throw Error('provider_outcome_unknown');let size=0,text='';const decoder=new TextDecoder();
    for(;;){const chunk=await reader.read();if(chunk.done)break;size+=chunk.value.byteLength;if(size>200000){await reader.cancel();throw Error('provider_outcome_unknown');}text+=decoder.decode(chunk.value,{stream:true});}text+=decoder.decode();
-   const raw=JSON.parse(text);if(raw.model!=='gpt-5.4-2026-03-05')throw Error('provider_outcome_unknown');observedUsage=usage(raw.usage);
+   const raw=JSON.parse(text);if(raw.model!=='gpt-5.4-2026-03-05')throw Error('provider_outcome_unknown');observedUsage=usage(raw.usage);observe('provider_usage',{usage:observedUsage});
    return new Response(text,{status:200,headers:{'Content-Type':'application/json'}});
   };
   const persist=async(result:Result|null)=>{
    await recheck();if(!cap||!initialSlot?.binding)throw Error('repository_unavailable');
    const envelope:Envelope={policy:attachmentPolicy,parser:pdfParserVersion,codeBinding,actorHash:sha(scope.actorId),binding:initialSlot.binding,pinHash,sourceSnapshot:snapshot,outcome:result?'needs_review':'provider_outcome_unknown',result,usage:observedUsage};
    const signed=mac(p.env.OPENAI_API_KEY!,envelope);
-   const saved=slot(await p.rpc('finish',ids[0],cap,envelope,signed),scope);
+   observe('finish_start');const saved=slot(await p.rpc('finish',ids[0],cap,envelope,signed),scope);
    if(!verified(saved)||canonicalAttachment(saved.receipt)!==canonicalAttachment(envelope))throw Error('repository_unavailable');
-   await recheck();const latest=await read(),confirmed=verified(latest);if(!confirmed)throw Error('receipt_unverified');await recheck();return confirmed;
+   await recheck();const latest=await read(),confirmed=verified(latest);if(!confirmed)throw Error('receipt_unverified');await recheck();observe('finished');return confirmed;
   };
   try{
    const result=await runReview({policyVersion:attachmentPolicy+':'+pdfParserVersion,scope:currentScope,sources:currentSources,
-    extract:s=>p.extract(s,request.signal),minimize:async segments=>{
+    extract:async s=>{observe('parse_start');const parsed=await p.extract(s,request.signal);observe('parse_complete');return parsed;},minimize:async segments=>{
      // One exact synthetic text page only. Extractor output is checked, never substituted with fixture text.
      if(segments.length!==1||segments[0].locator!=='page:1'||sha(segments[0].text)!==sha(smokeFixture.text))throw Error('synthetic_source_required');return segments;
     },model:responsesTransport(boundedSyntheticTrial(p.env.OPENAI_API_KEY),transport),reserve:async()=>{
      await recheck();if(request.signal.aborted)throw Error('cancelled');cap=randomBytes(32).toString('hex');
-     const reserved=slot(await p.rpc('reserve',ids[0],sha(cap)),scope);if(!reserved.permit||!reserved.sameSession)throw Error('provider_outcome_unknown');initialSlot=reserved;return true;
+     const reserved=slot(await p.rpc('reserve',ids[0],sha(cap)),scope);if(!reserved.permit||!reserved.sameSession)throw Error('provider_outcome_unknown');initialSlot=reserved;observe('reserved');return true;
     }},ids,'attachment-single-v98',request.signal);
    if(result.mode!=='live')throw Error('source_unreadable');
    return respond(await persist(result));
@@ -132,5 +135,5 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
    if(cap&&initialSlot?.binding){try{await persist(null);}catch{/* A consumed slot stays consumed. Never fall back to unsigned results. */}}
    throw e;
   }
- }catch(e){const code=safe(e);return Response.json({code,financialApproval:false,automaticRetryAllowed:false},{headers,status:['unauthorized'].includes(code)?401:code==='forbidden'?403:code==='invalid_request'?400:['source_changed','context_changed','provider_outcome_unknown','receipt_unverified','attachment_expired'].includes(code)?409:code==='budget_exhausted'?429:503});}
+ }catch(e){const code=safe(e);observe('failure',{code});return Response.json({code,financialApproval:false,automaticRetryAllowed:false},{headers,status:['unauthorized'].includes(code)?401:code==='forbidden'?403:code==='invalid_request'?400:['source_changed','context_changed','provider_outcome_unknown','receipt_unverified','attachment_expired'].includes(code)?409:code==='budget_exhausted'?429:503});}
 }
