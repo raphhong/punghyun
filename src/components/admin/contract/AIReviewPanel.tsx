@@ -4,11 +4,12 @@ import ReviewTriagePanel from './ReviewTriagePanel';
 import type {Result} from '@/lib/admin/ai/review';
 import {readReviewResult,factCanApply,readRequirementNotices,requirementMessage,type RequirementNotice} from '@/lib/admin/ai/presentation';
 type PanelProps={customerId:string;documents:{id:string;label:string;filename?:string|null;uploadedAt?:string|null;deviceId?:string|null}[];evidenceKeys:string[];applicationContext?:()=>number;onApply:(fact:Result['facts'][number],key:string,context?:number)=>void|boolean};
-export default function AIReviewPanel(props:PanelProps){const [selected,setSelected]=useState<string[]>(()=>props.documents.length===1?[props.documents[0].id]:[]),[tick,setTick]=useState(0),[accessDenied,setAccessDenied]=useState(false);const ids=selected.filter(id=>props.documents.some(d=>d.id===id));if(accessDenied)return <p role="alert">접근 권한이 변경됐습니다. 다시 로그인해 주세요.</p>;return <><AIReviewPanelInner onDenied={()=>setAccessDenied(true)} key={JSON.stringify([props.customerId,props.documents,props.evidenceKeys,[...ids].sort()])} {...props} selectedIds={ids} onIds={setSelected} onReviewed={()=>setTick(n=>n+1)}/>{ids.length>0&&<ReviewTriagePanel key={JSON.stringify([props.customerId,[...ids].sort()])} customerId={props.customerId} documentIds={ids} refreshKey={JSON.stringify([props.documents,tick])}/>}</>;}
+export default function AIReviewPanel(props:PanelProps){const [reviewPath,setReviewPath]=useState<'legacy'|'registered'>('legacy');const [selected,setSelected]=useState<string[]>(()=>props.documents.length===1?[props.documents[0].id]:[]),[tick,setTick]=useState(0),[accessDenied,setAccessDenied]=useState(false);const ids=selected.filter(id=>props.documents.some(d=>d.id===id));if(accessDenied)return <p role="alert">접근 권한이 변경됐습니다. 다시 로그인해 주세요.</p>;return <><details><summary>시험 경로 선택</summary><label>검수 경로<select aria-label="검수 경로" value={reviewPath} onChange={e=>setReviewPath(e.target.value==='registered'?'registered':'legacy')}><option value="legacy">기존 합성 검수 결과</option><option value="registered">승인 등록된 합성 자료 1회 시험</option></select></label><p>실제 고객자료는 전송하지 않습니다. 경로 선택만으로 실행 권한이 생기지 않습니다.</p></details><AIReviewPanelInner reviewPath={reviewPath} onDenied={()=>setAccessDenied(true)} key={JSON.stringify([props.customerId,props.documents,props.evidenceKeys,[...ids].sort(),reviewPath])} {...props} selectedIds={ids} onIds={setSelected} onReviewed={()=>setTick(n=>n+1)}/>{ids.length>0&&<ReviewTriagePanel key={JSON.stringify([props.customerId,[...ids].sort()])} customerId={props.customerId} documentIds={ids} refreshKey={JSON.stringify([props.documents,tick])}/>}</>;}
 
 const labels:Record<string,string>={'customer.name':'고객명','asset.model':'장비 모델','asset.serial':'제조번호','purchase.total':'매입 총액','rent.net':'렌탈 공급가액','rent.vat':'렌탈 부가세','rent.total':'렌탈 총액','rent.rate':'렌탈 요율','contract.date':'계약일','contract.days':'계약 기간'};
 const human=(value:string)=>value==='unknown'?'확인 필요':value==='inclusive'?'포함':value==='exclusive'?'별도':value==='not_applicable'?'해당 없음':value;
-function AIReviewPanelInner({customerId,documents,evidenceKeys,applicationContext,onApply,selectedIds:ids,onIds:setIds,onReviewed,onDenied}:PanelProps&{selectedIds:string[];onIds:(ids:string[])=>void;onReviewed:()=>void;onDenied:()=>void}){
+function AIReviewPanelInner({reviewPath,customerId,documents,evidenceKeys,applicationContext,onApply,selectedIds:ids,onIds:setIds,onReviewed,onDenied}:PanelProps&{reviewPath:'legacy'|'registered';selectedIds:string[];onIds:(ids:string[])=>void;onReviewed:()=>void;onDenied:()=>void}){
+ const endpoint='/api/admin/customers/'+encodeURIComponent(customerId)+'/ai-review'+(reviewPath==='registered'?'?reviewPath=registered':'');
  const [evidenceKey,setEvidenceKey]=useState('');
  const [requirements,setRequirements]=useState<RequirementNotice[]>([]);
  const [result,setResult]=useState<Result|null>(null),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[hasRequest,setHasRequest]=useState(false),[denied,setDenied]=useState(false);
@@ -22,13 +23,13 @@ function AIReviewPanelInner({customerId,documents,evidenceKeys,applicationContex
   if(inFlight.current||denied||ids.length!==1)return;
   stop();requestKey.current??=crypto.randomUUID();setHasRequest(true);const ticket=epoch.current,c=new AbortController();controller.current=c;inFlight.current=true;setBusy(true);setResult(null);setRequirements([]);setNotice('자료를 확인하고 있습니다.');
   try{
-   const endpoint='/api/admin/customers/'+encodeURIComponent(customerId)+'/ai-review';
-   const response=await fetch(readOnly?endpoint+'?documentId='+encodeURIComponent(ids[0]):endpoint,readOnly?{cache:'no-store',signal:c.signal}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({documentIds:ids,key:requestKey.current}),signal:c.signal});
+   const response=await fetch(readOnly?endpoint+(reviewPath==='registered'?'&':'?')+'documentId='+encodeURIComponent(ids[0]):endpoint,readOnly?{cache:'no-store',signal:c.signal}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({documentIds:ids,key:requestKey.current}),signal:c.signal});
    if(ticket!==epoch.current)return;
    if(response.status===401||response.status===403){stop();setDenied(true);onDenied();setResult(null);setIds([]);setEvidenceKey('');requestKey.current=null;setHasRequest(false);setNotice('접근 권한을 확인해 주세요.');return;}
    const raw=await response.json();if(ticket!==epoch.current)return;
    if(raw?.state==='ready'){setHasRequest(false);setNotice('합성 자료 1건을 검수할 수 있습니다. 실제 고객자료는 처리하지 않습니다.');return;}
    if(['attachment_not_configured','synthetic_source_required'].includes(raw?.code)){setNotice(raw.code==='attachment_not_configured'?'첨부 검수 저장 연결을 준비하고 있습니다. 아직 실행되지 않았습니다.':'이번 연결 시험에 등록된 합성 자료를 선택해 주세요. 실제 고객자료는 전송하지 않습니다.');return;}
+   if(['approval_required','repository_unavailable','budget_reconciliation_required','minimization_required'].includes(raw?.code)){setNotice(({approval_required:'이 자료의 시험 등록을 기다리고 있습니다. 새 검수는 실행하지 않습니다.',repository_unavailable:'저장 연결을 확인해야 합니다. 새로 실행하지 않고 결과를 다시 확인합니다.',budget_reconciliation_required:'시험 사용량 확인이 필요합니다. 새 검수는 실행하지 않습니다.',minimization_required:'보낼 원문 범위가 현재 자료와 맞는지 확인해야 합니다. 새 검수는 실행하지 않습니다.'} as Record<string,string>)[raw.code]);return;}
    if(raw?.code==='source_unreadable'){setNotice('원문을 읽을 수 없습니다. 스캔·암호화·지원하지 않는 자료는 풍현에서 먼저 확인합니다. AI는 실행하지 않았습니다.');return;}
    if(raw?.code==='attachment_expired'||raw?.state==='attachment_expired'){setNotice('이번 시험의 실행 기간이 끝났습니다. 새 실행은 하지 않습니다.');return;}
    if(raw?.code==='receipt_unverified'){setNotice('저장된 결과의 검증이 필요합니다. 새 검수는 실행하지 않습니다.');return;}
@@ -51,7 +52,7 @@ function AIReviewPanelInner({customerId,documents,evidenceKeys,applicationContex
   if(inFlight.current||!result?.sourceSnapshot||!evidenceKeys.includes(evidenceKey)||!factCanApply(result,f))return;
   const previous=result,chosenKey=evidenceKey,applyContext=applicationContext?.(),ticket=epoch.current,c=new AbortController();controller.current=c;inFlight.current=true;setBusy(true);
   try{
-   const response=await fetch('/api/admin/customers/'+encodeURIComponent(customerId)+'/ai-review',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',documentIds:ids,sourceSnapshot:previous.sourceSnapshot}),signal:c.signal});
+   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',documentIds:ids,sourceSnapshot:previous.sourceSnapshot}),signal:c.signal});
    const raw=await response.json();if(ticket!==epoch.current)return;
    if(response.status===401||response.status===403){setDenied(true);onDenied();setResult(null);setEvidenceKey('');setIds([]);return;}
    if(!response.ok||raw.receiptVerified!==true||raw.persistedResult!==true)throw Error('stale');
