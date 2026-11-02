@@ -7,7 +7,7 @@ const canonical=(v:unknown):string=>JSON.stringify(v,(_k,x)=>x&&typeof x==='obje
 /** Local candidate: disabled until a separately approved, bounded RPC and deployment policy exist.
  * Uses current JWT/RLS, never a service-role client. RPC must recheck ownership, expiry,
  * revision, cancellation, source bytes pin and bounded approval before queueing. No model call here. */
-export function createSalesReviewEndpoint(db:SupabaseClient,customerId:string,config:{enabled:boolean;feedbackKey?:string}){
+export function createSalesReviewEndpoint(db:SupabaseClient,customerId:string,config:{enabled:boolean;feedbackKey?:string;automatic?:(ids:string[],execute:boolean,origin:string,signal:AbortSignal)=>Promise<Record<string,unknown>>}){
  return async(request:Request)=>{const headers={'Cache-Control':'no-store'};try{
   if(!uuid(customerId)||!['GET','POST'].includes(request.method))throw Error('invalid_request');
   const auth=await db.auth.getUser();if(auth.error||!auth.data.user)throw Error('forbidden');
@@ -19,11 +19,12 @@ export function createSalesReviewEndpoint(db:SupabaseClient,customerId:string,co
    if(!v||!['request','cancel'].includes(v.action)||Object.keys(v).sort().join()!=='action,documentIds,idempotencyKey,revision,sourceSnapshot'||!Array.isArray(v.documentIds)||!v.documentIds.length||v.documentIds.length>8||v.documentIds.some((id:unknown)=>!uuid(id))||new Set(v.documentIds).size!==v.documentIds.length||!uuid(v.idempotencyKey)||!Number.isSafeInteger(v.revision)||v.revision<0||!/^[a-f0-9]{64}$/.test(v.sourceSnapshot))throw Error('invalid_request');data=v;
   }
   const r=await db.rpc('sales_review_feedback_v1',{p_customer:customerId,p_action:data.action,p_data:data.action==='read'?{}:data});
-  if(r.error||!r.data)throw Error('review_not_connected');
+  if(r.error?.message==='forbidden')throw Error('forbidden');if(r.error||!r.data)throw Error('review_not_connected');
   const v=r.data;if(!uuid(v.agentId)||v.customerId!==customerId||typeof v.sourceSnapshot!=='string')throw Error('forbidden');
   // The limited RPC checks current session, direct assignment and pilot scope; no direct business-table read for sales.
   const again=await db.auth.getUser(),current=await db.rpc('sales_review_feedback_v1',{p_customer:customerId,p_action:'read',p_data:{}});
   if(again.error||again.data.user?.id!==auth.data.user.id||current.error||!current.data||current.data.agentId!==v.agentId||current.data.customerId!==customerId||current.data.sourceSnapshot!==v.sourceSnapshot)throw Error('forbidden');
+  if(config.automatic&&data.action!=='cancel'){const result=await config.automatic(v.documentIds,data.action==='request',new URL(request.url).origin,request.signal);const latest=await db.rpc('sales_review_feedback_v1',{p_customer:customerId,p_action:'read',p_data:{}});if(latest.error||latest.data?.sourceSnapshot!==v.sourceSnapshot||latest.data?.agentId!==v.agentId)throw Error('forbidden');return Response.json({...result,sourceSnapshot:v.sourceSnapshot,revision:v.revision},{headers});}
   // Signed projection is separate from internal model receipts. Neither browser nor SQL claims a completed model run.
   if(!v.feedback){if(!['not_run','requested','running','failed','cancelled','unknown','stale'].includes(v.status)||!Number.isSafeInteger(v.revision))throw Error('invalid_feedback');return Response.json({status:v.status,sourceSnapshot:v.sourceSnapshot,revision:v.revision,issues:[],executionAllowed:false,requestAllowed:false,financialApproval:false},{headers});}
   if(typeof v.mac!=='string'||!/^[a-f0-9]{64}$/.test(v.mac))throw Error('feedback_unverified');

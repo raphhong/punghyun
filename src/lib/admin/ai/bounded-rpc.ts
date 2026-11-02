@@ -1,3 +1,4 @@
+import {salesReviewSources} from '../../sales/review-sources';
 import type {WholeVisualApproval} from './document-vision-input';
 import {extractDocument,documentRuntimeFromEnvironment} from './document-extraction';
 import type {SupabaseClient} from '@supabase/supabase-js';
@@ -16,16 +17,17 @@ type Authorization={id:string;actorId:string;dataClass:'synthetic'|'customer';po
  * db must be the current request's server SSR JWT client. Registration selection is server-owned,
  * NOT body/query JSON. Customer-data configuration needs a separate explicit release approval.
  * DB receipts are untrusted; the reused handler verifies server MAC + current bytes before returning. */
-export function createBoundedReviewRuntime(input:{db:SupabaseClient;env:Record<string,string|undefined>;customerId:string;documentId:string;approvalId?:string;enabled:boolean;allowedDataClass:'synthetic'|'customer';transport?:typeof fetch;pilotPolicyId?:string}){
+export function createBoundedReviewRuntime(input:{access?:'sales';db:SupabaseClient;env:Record<string,string|undefined>;customerId:string;documentId:string;approvalId?:string;enabled:boolean;allowedDataClass:'synthetic'|'customer';transport?:typeof fetch;pilotPolicyId?:string}){
  return async(request:Request)=>{
   const headers={'Cache-Control':'no-store','Pragma':'no-cache'};
   try{
+   if(input.access==='sales'&&!input.pilotPolicyId)throw Error('forbidden');
    if(input.pilotPolicyId!==undefined&&!uuid(input.pilotPolicyId))throw Error('forbidden');
    if(input.enabled!==true||!smokeEnvironment(input.env))throw Error('forbidden');
    if(!['GET','POST'].includes(request.method)||request.method==='POST'&&request.headers.get('origin')!==new URL(request.url).origin||![input.customerId,input.documentId].every(uuid)||input.approvalId!==undefined&&!uuid(input.approvalId))throw Error('forbidden');
    const auth=await input.db.auth.getUser();if(auth.error||!uuid(auth.data?.user?.id))throw Error('forbidden');const actorId=auth.data.user.id;let resolvedApproval=input.approvalId??null;
    async function rpc(action:'read'|'reserve'|'finish',cap?:string,receipt?:unknown,mac?:string){
-    try{const r=await input.db.rpc(input.pilotPolicyId?'admin_bounded_review_v113':'admin_bounded_review_v104',{p_customer:input.customerId,p_document:input.documentId,p_approval:resolvedApproval,p_action:action,p_cap:cap??null,p_receipt:receipt??null,p_mac:mac??null});if(r.error)throw Error(safe(r.error));return r.data;}catch(e){throw Error(safe(e));}
+    try{const r=await input.db.rpc(input.access==='sales'?'sales_review_bounded_v1':input.pilotPolicyId?'admin_bounded_review_v113':'admin_bounded_review_v104',{p_customer:input.customerId,p_document:input.documentId,p_approval:resolvedApproval,p_action:action,p_cap:cap??null,p_receipt:receipt??null,p_mac:mac??null});if(r.error)throw Error(safe(r.error));return r.data;}catch(e){throw Error(safe(e));}
    }
    const raw=await rpc('read');if(!raw||typeof raw!=='object'||Object.keys(raw).sort().join()!=='authorization,slot')throw Error('repository_unavailable');
    const a=raw.authorization as Authorization,pin=raw.slot?.pin as AttachmentPin;
@@ -33,7 +35,7 @@ export function createBoundedReviewRuntime(input:{db:SupabaseClient;env:Record<s
    if(input.pilotPolicyId&&(!a.budget||a.budget.id!==input.pilotPolicyId||Object.keys(a.budget).sort().join()!=='id,maxAttempts,maxMicrousd,revision'||a.budget.maxAttempts>100||a.budget.maxMicrousd>20000000||a.budget.maxMicrousd<500000||![a.budget.revision,a.budget.maxAttempts,a.budget.maxMicrousd].every(n=>Number.isSafeInteger(n)&&n>0)))throw Error('forbidden');
    resolvedApproval=a.id;
    const authorizationHash=sha(canonicalAttachment(a));
-   const base=actorSources(input.db,'zatlumldeqhghhrsgtdq',input.customerId,'bounded-review:'+a.id);
+   const base=input.access==='sales'?salesReviewSources(input.db,input.customerId,'bounded-review:'+a.id,[input.documentId]):actorSources(input.db,'zatlumldeqhghhrsgtdq',input.customerId,'bounded-review:'+a.id);
    const visual=(a.release as TextRelease&{visual?:WholeVisualApproval}).visual;
    if(visual&&a.dataClass!=='synthetic')throw Error('forbidden');
    const minimize=rangeMinimizer(a.release);
