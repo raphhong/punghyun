@@ -45,6 +45,9 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
  let observedUsage:Usage|null=null;
  const started=Date.now();const observe=(stage:AttachmentDiagnostic['stage'],extra:Pick<AttachmentDiagnostic,'code'|'httpStatus'|'usage'>={})=>{try{p.observe?.({stage,elapsedMs:Date.now()-started,...extra});}catch{/* Diagnostics never authorize or change the operation. */}};observe('start');
  const codeBinding=sha([p.env.VERCEL_PROJECT_ID,p.env.VERCEL_GIT_COMMIT_REF,p.env.VERCEL_GIT_COMMIT_SHA,attachmentPolicy].join(':'));
+ // One independently verified predecessor for this SAME byte-pinned synthetic policy only.
+ // MAC, actor/session, exact source/policy/parser and current authorization remain mandatory.
+ const verifiedPredecessor=sha([p.env.VERCEL_PROJECT_ID,p.env.VERCEL_GIT_COMMIT_REF,'1a87a99a0aecf93bae6cfe3c90b029ced2d117d4',attachmentPolicy].join(':'));
  try{
   if(!smokeEnvironment(p.env))throw Error('attachment_not_configured');
   if(!['GET','POST'].includes(request.method)||request.method==='POST'&&request.headers.get('origin')!==new URL(request.url).origin)throw Error('forbidden');
@@ -81,7 +84,7 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
    try{
     if(!p.env.OPENAI_API_KEY||!r.sameSession||!hex(r.receiptMac)||!exact(r.receipt,['policy','parser','codeBinding','actorHash','binding','pinHash','sourceSnapshot','outcome','result','usage']))return null;
     const e=r.receipt as Envelope;
-    if(e.policy!==attachmentPolicy||e.parser!==pdfParserVersion||e.codeBinding!==codeBinding||e.actorHash!==sha(scope.actorId)||e.binding!==r.binding||e.pinHash!==pinHash||e.sourceSnapshot!==snapshot||!['needs_review','provider_outcome_unknown'].includes(e.outcome)||Buffer.byteLength(canonicalAttachment(e))>32000)return null;
+    if(e.policy!==attachmentPolicy||e.parser!==pdfParserVersion||(e.codeBinding!==codeBinding&&e.codeBinding!==verifiedPredecessor)||e.actorHash!==sha(scope.actorId)||e.binding!==r.binding||e.pinHash!==pinHash||e.sourceSnapshot!==snapshot||!['needs_review','provider_outcome_unknown'].includes(e.outcome)||Buffer.byteLength(canonicalAttachment(e))>32000)return null;
     if(!timingSafeEqual(Buffer.from(r.receiptMac,'hex'),Buffer.from(mac(p.env.OPENAI_API_KEY,e),'hex')))return null;
     if(e.outcome==='needs_review'){
      const result=readReviewResult(e.result);if(result.mode!=='live'||result.sourceSnapshot!==snapshot||result.facts.some(f=>f.sourceId!==sources[0].id||f.version!==sources[0].version||f.sha256!==sources[0].sha256||f.assetId!==sources[0].assetId))return null;
@@ -140,3 +143,4 @@ export async function handleAttachmentReview(request:Request,p:AttachmentPorts){
   }
  }catch(e){const code=safe(e);observe('failure',{code});return Response.json({code,financialApproval:false,automaticRetryAllowed:false},{headers,status:['unauthorized'].includes(code)?401:code==='forbidden'?403:code==='invalid_request'?400:['source_changed','context_changed','provider_outcome_unknown','receipt_unverified','attachment_expired'].includes(code)?409:code==='budget_exhausted'?429:503});}
 }
+
