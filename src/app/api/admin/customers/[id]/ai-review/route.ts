@@ -16,7 +16,7 @@ async function handle(request:Request,{params}:{params:Promise<{id:string}>}){
   if(!smokeEnvironment(process.env))return Response.json({status:'waiting_provider',mode:'disconnected',facts:[],supplements:[],financialApproval:false},{status:503,headers});
   return await handleAttachmentReview(request,{env:process.env,...sources,extract:extractPdfText,observe:event=>console.info(JSON.stringify({kind:'attachment_trial_stage',...event})),rpc:async(action,documentId,cap,receipt,mac)=>{
    try{
-    const r=await db.rpc('admin_ai_attachment_v98',{p_customer:id,p_document:documentId,p_action:action,p_cap:cap??null,p_receipt:receipt??null,p_mac:mac??null});
+    const r=await db.rpc('admin_ai_attachment_v101',{p_customer:id,p_document:documentId,p_action:action,p_cap:cap??null,p_receipt:receipt??null,p_mac:mac??null});
     if(r.error){if(r.error.code==='PGRST202'||r.error.code==='42883')throw Error('attachment_not_configured');throw Error(['forbidden','source_changed','synthetic_source_required','budget_exhausted','attachment_expired'].includes(r.error.message)?r.error.message:'repository_unavailable');}
     return r.data;
    }catch(e){throw Error(e instanceof Error&&['forbidden','source_changed','synthetic_source_required','budget_exhausted','attachment_expired','attachment_not_configured'].includes(e.message)?e.message:'repository_unavailable');}
