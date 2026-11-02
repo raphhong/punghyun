@@ -43,3 +43,16 @@ const passed=[];async function check(name,f){await f();passed.push(name);}
  await check('wrong historical aggregate or oversized provider usage denied',async()=>{const{p,state}=setup(),old=p.rpc;p.rpc=async(...a)=>({...await old(...a),usedAttempts:1});assert.notEqual((await handleAttachmentReview(req(),p)).status,200);assert.equal(state.calls,0);});
  console.log(JSON.stringify({passed,actualApiCalls:0,parser:'actual pdfjs 6.5.438',transport:'synthetic fake',storage:'in-memory capability/MAC port'},null,2));fs.rmSync(out,{recursive:true,force:true});
 })().catch(e=>{console.error(e);process.exitCode=1});
+
+// File choice metadata uses the same catalog projection as the authenticated page.
+{
+ const vm=require('node:vm'),box={exports:{},TextDecoder,Uint8Array,atob,require:()=>({ALL_DOCS:[],TRANSACTION_DOCS:[]})};
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'src/lib/admin/contract-preparation.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);
+ const key='other_document_synthetic',name='합성 확인.pdf',storage=customer+'/'+key+'/'+Buffer.from(name).toString('base64url')+'.pdf';
+ const project=box.exports.projectContractSourceCatalog(customer,{data:[],error:null},{data:[{id:doc,customer_id:customer,doc_key:key,category:'other',device_id:null,uploaded_at:'2026-11-02T01:00:00Z',file_path:storage}],error:null});
+ assert.equal(project.documents.items[0].filename,name);assert.equal('file_path' in project.documents.items[0],false);
+ assert.equal(box.exports.contractDocumentFilename('other',key,storage),null);
+ assert.equal(box.exports.contractDocumentFilename(customer,key,customer+'/'+key+'/!!!!.pdf'),null);
+ assert.equal(box.exports.contractDocumentFilename(customer,key,customer+'/'+key+'/'+Buffer.from('../hidden.pdf').toString('base64url')+'.pdf'),null);
+ console.log('PASS attachment display: UTF-8 filename, customer binding, malformed/path rejection, no raw storage path');
+}
