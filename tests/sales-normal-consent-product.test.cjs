@@ -23,3 +23,15 @@ test('actual workbook preview → file consent → mocked review → saved GET �
 });
 test('missing deployment data scope leaves policy unavailable; owner policy cannot select outside configured scope',()=>{assert.equal(transmissionCeiling({}),null);const ceiling={dataClass:'synthetic',allowedMime:['application/pdf'],allowedCategories:['quote'],allowedHashes:['a'.repeat(64)],expiresAt:Date.now()+10000};assert.throws(()=>ownerPolicy({active:true,expiresAt:ceiling.expiresAt,allowedMime:['image/png'],allowedCategories:['quote'],maxDocuments:1},{id:pid,revision:0,policy:null},ceiling),/invalid_policy/);});
 test('normal sales UI starts with explicit selection and separate no-model saved-result lookup',()=>{const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');const Component=load('src/components/sales/NormalReviewPanel.tsx').default;const html=renderToStaticMarkup(React.createElement(Component,{customerId:'synthetic',documents:[{id:doc,label:'합성 매출.xlsx',version:'v1'}]}));assert(html.includes('AI 검수 Beta'));assert(html.includes('최종 심사 판단은 담당자가'));assert(html.includes('합성 매출.xlsx'));assert(html.includes('저장 결과 조회 · 모델 호출 없음'));assert(html.includes('현재 파일 전송 내용 확인'));assert(html.includes('자료가 일부만 있어도'));});
+test('text output increase requires explicit trusted synthetic ceiling; client cannot raise it',()=>{
+ const ceiling={dataClass:'synthetic',allowedMime:['application/pdf'],allowedCategories:['sales'],allowedHashes:[sha('synthetic')],expiresAt:Date.now()+60000};
+ const input={active:true,expiresAt:ceiling.expiresAt,allowedMime:ceiling.allowedMime,allowedCategories:ceiling.allowedCategories,maxDocuments:1,maxOutputTokens:4000};
+ const before={id:pid,revision:0,policy:null};
+ assert.equal(ownerPolicy(input,before,ceiling).maxOutputTokens,1000);
+ const config={...ceiling,maxTextOutputTokens:4000};
+ const parsed=transmissionCeiling({SALES_AI_TRANSMISSION_CEILING:JSON.stringify(config)});assert(parsed);
+ assert.equal(ownerPolicy(input,before,parsed).maxOutputTokens,4000);
+ for(const value of [0,4001,1.5,'4000',null]){const invalid={...ceiling,maxTextOutputTokens:value};assert.equal(transmissionCeiling({SALES_AI_TRANSMISSION_CEILING:JSON.stringify(invalid)}),null);assert.throws(()=>ownerPolicy(input,before,invalid));}
+ assert.equal(transmissionCeiling({SALES_AI_TRANSMISSION_CEILING:JSON.stringify({...config,dataClass:'customer'})}),null);
+ const visual={...config,allowWholeVisual:true};assert.equal(ownerPolicy({...input,allowWholeVisual:true},before,visual).maxOutputTokens,1000);
+});

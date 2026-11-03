@@ -17,3 +17,33 @@ const model=c=>responsesTransport(c,async()=>{calls++;return Response.json(envel
 const handler=normalReviewEndpoint({context:async()=>ctx,repository,extract:async()=>[s],model,apiKey:'DO_NOT_LOG_KEY'});const post=()=>handler(new Request('https://local.test/review',{method:'POST',headers:{origin:'https://local.test'},body:JSON.stringify({action:'request',documentIds:[id],sourceSnapshot:ctx.snapshot,idempotencyKey:'22222222-2222-4222-8222-222222222222'})}));
 assert.equal((await post()).status,409);assert.equal(job.status,'unknown');assert.equal(saved.errorCode,'content_citation');assert.equal(saved.stage,'result_validation');assert.equal(saved.inputTokens,123);assert.equal(saved.httpStatus,200);assert(!JSON.stringify(saved).includes('DO_NOT_LOG'));await post();assert.equal(calls,1);assert.equal(job.status,'unknown');
 });
+test('incomplete reasons are distinguished; partial valid JSON is never accepted or retried',async()=>{
+ for(const [reason,code] of [['max_output_tokens','provider_output_limit'],['content_filter','provider_content_filter'],['DO_NOT_LOG_REASON','provider_incomplete']]){
+  let calls=0,d={};const x=envelope({facts:[]});x.status='incomplete';x.incomplete_details={reason};x.usage={input_tokens:3061,output_tokens:1000,output_tokens_details:{reasoning_tokens:0},input_tokens_details:{cached_tokens:0}};
+  const model=responsesTransport({...config,diagnostic:e=>d={...d,...e}},async()=>{calls++;return Response.json(x);});
+  await assert.rejects(model.analyze([segment],new AbortController().signal),/provider_outcome_unknown/);
+  assert.equal(calls,1);assert.equal(d.errorCode,code);assert.equal(d.providerStatus,'incomplete');assert.equal(d.incompleteReason,reason==='DO_NOT_LOG_REASON'?'unknown':reason);assert.equal(d.configuredOutputLimit,1000);assert.equal(d.reasoningTokens,0);assert.equal(d.cachedInputTokens,0);assert.equal(d.outputTextPresent,true);assert.equal(d.billingVerified,false);assert(!JSON.stringify(d).includes('DO_NOT_LOG'));
+ }
+});
+test('failed, noncompleted and unknown status cannot be misclassified as output cap exhaustion',async()=>{
+ for(const [status,code] of [['failed','provider_failed'],['queued','provider_not_completed'],['DO_NOT_LOG_STATUS','provider_not_completed']]){
+  let d={};const model=responsesTransport({...config,diagnostic:e=>d={...d,...e}},async()=>Response.json({status,error:{message:'DO_NOT_LOG_ERROR'},usage:{output_tokens:1000}}));
+  await assert.rejects(model.analyze([segment],new AbortController().signal));assert.equal(d.errorCode,code);assert.equal(d.incompleteReason,undefined);assert(!JSON.stringify(d).includes('DO_NOT_LOG'));
+ }
+});
+test('malformed metadata is bounded and contains no response content',()=>{
+ const {textEnvelopeDiagnostic}=load('src/lib/admin/ai/openai.ts');
+ for(const input of [null,[],42,'DO_NOT_LOG'])assert.equal(textEnvelopeDiagnostic(input).providerStatus,'unknown');
+ const d=textEnvelopeDiagnostic({status:'incomplete',incomplete_details:{reason:{secret:'DO_NOT_LOG'}},usage:{input_tokens:2,output_tokens:3,output_tokens_details:{reasoning_tokens:4},input_tokens_details:{cached_tokens:-1}},output:[null,{type:'message',content:[null,{type:'output_text',text:'DO_NOT_LOG_CONTENT'}]}]});
+ assert.equal(d.reasoningTokens,undefined);assert.equal(d.cachedInputTokens,undefined);assert.equal(d.incompleteReason,'unknown');assert.equal(d.outputTextPresent,true);assert(!JSON.stringify(d).includes('DO_NOT_LOG'));
+});
+test('candidate 4000 cap needs explicit configuration; legacy trial remains 1000 with no implicit retry or reasoning change',async()=>{
+ const {boundedSyntheticTrial,assertSyntheticTrialConfig}=load('src/lib/admin/ai/openai.ts');
+ assert.equal(boundedSyntheticTrial('LOCAL_PLACEHOLDER').maxOutputTokens,1000);
+ assert.throws(()=>assertSyntheticTrialConfig({...config,maxOutputTokens:4000}),/trial_configuration/);
+ for(const limit of [1000,4000]){
+  let sent,calls=0;const model=responsesTransport({...config,maxOutputTokens:limit},async(_url,request)=>{calls++;sent=JSON.parse(request.body);return Response.json(envelope({facts:[]}));});
+  await model.analyze([segment],new AbortController().signal);assert.equal(sent.max_output_tokens,limit);assert.equal(sent.reasoning,undefined);assert.equal(sent.store,false);assert.equal(sent.background,false);assert.deepEqual(sent.tools,[]);assert.equal(calls,1);
+ }
+ assert.throws(()=>responsesTransport({...config,maxOutputTokens:4001}),/provider_configuration/);
+});
