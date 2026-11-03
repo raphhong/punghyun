@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { LogoMark } from "@/components/Logo";
 import {
   HOSPITAL_TYPES,
+  PURCHASE_INTENT_DOCS,
+  purchaseIntentRequirement,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
   docsForType,
@@ -59,7 +61,7 @@ export default async function PublicSubmitPage({
 
   if (!customer) notFound();
 
-  const { data: docRows } = await db
+  const { data: docRows, error: docsError } = await db
     .from("customer_documents")
     .select("doc_key, checked, file_path, device_id")
     .eq("customer_id", customer.id);
@@ -179,6 +181,12 @@ export default async function PublicSubmitPage({
         </button>
       </form>
 
+      <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
+        <h2 className="text-base font-semibold text-navy-900">매입의향서 · 풍현 필수</h2>
+        <p className="text-sm text-navy-500">{purchaseIntentRequirement(docRows ?? [], !!docsError).message}</p>
+        <p className="text-sm text-navy-500">풍현 자체 제출 요건입니다. 파일 수령은 내용 검토나 심사 승인·계약 완료를 뜻하지 않습니다.</p>
+        <DocUpload docs={PURCHASE_INTENT_DOCS} docMap={docMap} signedMap={signedMap} token={token} />
+      </section>
       {/* 서류 업로드 */}
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
         <div>

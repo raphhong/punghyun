@@ -162,12 +162,12 @@ export const SCREENING_3_DOCS: DocItem[] = [
   },
 ];
 
-// 관리자 고객 상세에서 별도로 보관하는 선택 서류.
-// 고객·영업자 제출 목록(ALL_DOCS)에는 포함하지 않음.
+// 풍현 자체 필수 제출서류. 기존 doc_key/category를 유지해 기존 파일을 재사용한다.
+// 수령과 내용 검토는 별개이며 금융기관/비즈마켓의 직접 요구로 표시하지 않는다.
 export const PURCHASE_INTENT_DOCS: DocItem[] = [
   {
     key: "purchase_intent",
-    label: "매입의향서",
+    label: "매입의향서 (풍현 필수)",
     category: "inspection",
   },
 ];
@@ -278,8 +278,8 @@ export const MATURITY_DOCS: DocItem[] = [
   },
 ];
 
-// 고객에게 안내하는 필수 서류(공유 문구)는 심사서류만. 거래 서류는 내부 관리.
-export const ALL_DOCS: DocItem[] = [...SCREENING_2_DOCS, ...SCREENING_3_DOCS];
+// 고객 제출서류와 풍현 자체 필수서류. 계약 생성·체결 서류는 내부 관리.
+export const ALL_DOCS: DocItem[] = [...SCREENING_2_DOCS, ...SCREENING_3_DOCS, ...PURCHASE_INTENT_DOCS];
 
 // 거래 진정성 서류 전체 (내부 참고용)
 export const TRANSACTION_DOCS: DocItem[] = [
@@ -287,3 +287,21 @@ export const TRANSACTION_DOCS: DocItem[] = [
   ...DELIVERY_DOCS,
   ...MATURITY_DOCS,
 ];
+
+/** 전체 등록자료 조회 결과로만 수령 여부를 판단한다. checked는 업로드 시에도 true이므로 검토 증거가 아니다. */
+export function purchaseIntentRequirement(
+  rows: readonly { doc_key: string; file_path?: string | null; checked?: boolean | null }[],
+  lookupFailed = false,
+) {
+  const received = rows.some(row => row.doc_key === "purchase_intent" && !!row.file_path?.trim());
+  const state = lookupFailed ? "unknown" : received ? "received" : "not_received";
+  return {
+    key: "purchase_intent" as const, authority: "punghyun" as const, required: true as const,
+    state, contentReview: "unconfirmed" as const,
+    message: state === "unknown"
+      ? "매입의향서 · 풍현 필수 · 수령 여부 미확인. 자료 조회 후 기존 파일이 있는지 확인해 주세요."
+      : state === "received"
+        ? "매입의향서 · 풍현 필수 · 파일 수령. 기존 파일을 사용하며 다시 요청하지 않습니다. 내용 검토 여부는 별도 확인이 필요합니다."
+        : "매입의향서 · 풍현 필수 · 등록된 파일이 없습니다. 이미 받은 자료가 있다면 매입의향서 항목에 등록하고, 아직 받지 않았다면 제출을 요청해 주세요.",
+  };
+}

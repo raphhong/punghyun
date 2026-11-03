@@ -27,6 +27,7 @@ import {
   MATURITY_DOCS,
   MATURITY_RESULTS,
   PURCHASE_INTENT_DOCS,
+  purchaseIntentRequirement,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
   docsForType,
@@ -148,14 +149,14 @@ export default async function CustomerDetailPage({
       ...MATURITY_DOCS,
     ].map((d) => [d.key, d.label]),
   );
-  let photoNo = 0;
+  const photoNumbers = new Map(docs.filter(row => row.file_path && signedMap.has(row.file_path) && row.doc_key.startsWith("device_photo_")).map((row, index) => [row.doc_key, index + 1]));
   const galleryItems: GalleryItem[] = docs
     .map((row) => {
       const url = row.file_path ? signedMap.get(row.file_path) : undefined;
       if (!row.file_path || !url) return null;
       const ext = (row.file_path.split(".").pop() ?? "").toLowerCase();
       const label = row.doc_key.startsWith("device_photo_")
-        ? `기기 사진 ${(photoNo += 1)}`
+        ? `기기 사진 ${photoNumbers.get(row.doc_key)}`
         : isOtherDocument(row.doc_key)
           ? `기타 서류 · ${otherDocumentFilename(row.file_path)}`
           : (docLabelMap.get(row.doc_key) ?? row.doc_key);
@@ -386,8 +387,8 @@ ${docLines}
       </CollapsibleCard>
 
       <CollapsibleCard
-        title="매입의향서"
-        desc="고객별 매입의향서를 업로드하고 확인할 수 있습니다. (선택)"
+        title="매입의향서 · 풍현 필수"
+        desc={purchaseIntentRequirement(docs, !!docsRes.error).message}
         open
       >
         <DocList docs={PURCHASE_INTENT_DOCS} customerId={id} docMap={docMap} signedMap={signedMap} />
@@ -639,7 +640,7 @@ function DocList({
         const checked = row?.checked ?? false;
         return (
           <li key={doc.key} className="flex flex-wrap items-center gap-3 py-3">
-            <form action={toggleDocument} className="flex items-center">
+            {doc.key !== "purchase_intent" && <form action={toggleDocument} className="flex items-center">
               <input type="hidden" name="customer_id" value={customerId} />
               <input type="hidden" name="doc_key" value={doc.key} />
               <input type="hidden" name="category" value={doc.category} />
@@ -655,7 +656,7 @@ function DocList({
               >
                 ✓
               </button>
-            </form>
+            </form>}
 
             <span className={`flex-1 text-sm ${checked ? "text-navy-800" : "text-navy-500"}`}>
               {doc.label}

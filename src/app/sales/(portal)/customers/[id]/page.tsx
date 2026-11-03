@@ -6,6 +6,8 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import {
   ALL_DOCS,
+  PURCHASE_INTENT_DOCS,
+  purchaseIntentRequirement,
   HOSPITAL_TYPES,
   SCREENING_2_DOCS,
   SCREENING_3_DOCS,
@@ -135,7 +137,7 @@ ${docLines}
 
   return (
     <div className="space-y-6">
-      {agent?.status === 'approved' && customer.sales_agent_id === agent.id && (process.env.SALES_AI_REVIEW_ENABLED==='normal-product-v1'?<NormalReviewPanel customerId={id} documents={reviewDocuments}/>:<SalesReviewPanel customerId={id} documents={reviewDocuments}/>)}
+      {agent?.status === 'approved' && customer.sales_agent_id === agent.id && (process.env.SALES_AI_REVIEW_ENABLED==='normal-product-v1'?<NormalReviewPanel customerId={id} documents={reviewDocuments} purchaseIntentNotice={purchaseIntentRequirement(docs, !!docsRes.error).message}/>:<SalesReviewPanel customerId={id} documents={reviewDocuments}/>)}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">
@@ -209,6 +211,10 @@ ${docLines}
         <div id="customer-guide"><ProductShare url={shareUrl} standardMessage={shareMessage} initialProduct={product} /></div>
       </Card>
 
+      <Card title="매입의향서 · 풍현 필수" desc={purchaseIntentRequirement(docs, !!docsRes.error).message}>
+        <p className="mb-3 text-sm text-navy-500">풍현 자체 제출 요건입니다. 비즈마켓의 직접 요구나 심사 승인·계약 완료를 의미하지 않습니다.</p>
+        <DocList docs={PURCHASE_INTENT_DOCS} docMap={docMap} signedMap={signedMap} customerId={customer.id} />
+      </Card>
       {/* 서류 현황 */}
       <Card title="일반렌탈 2차 스크리닝 서류 (기존 자료)">
         <DocList
