@@ -27,13 +27,40 @@ export function reviewOverview(documents:ReviewDocument[],status?:string){
  if(status==='failed'||status==='unknown')return {title:'검수 결과 미확인',message:'파일은 등록되어 있습니다. 읽기·처리 실패를 자료 없음으로 처리하지 않습니다. 저장 상태를 먼저 조회하고, 결과 없이 반복 실행하지 마세요.'};
  return {title:`등록 자료 ${new Set(documents.map(d=>d.id)).size}건`,message:'가지고 있는 자료부터 검수할 수 있습니다. 이미 등록된 자료는 다시 요청하지 않고, 불일치·판독 불가·확인할 부분만 보완합니다. 전송 확인과 서버 실행 허용은 별도로 필요합니다.'};
 }
+/** Display-only formatting. Persisted locators and quotations remain byte-for-byte unchanged. */
+function worksheetLocation(locator:string){
+ const m=locator.match(/^sheet:(\d+);name:([^;]*);cell:([A-Z]+\d+);part:(value|formula|cached)$/);
+ if(!m)return null;
+ let name:string;try{name=decodeURIComponent(m[2]);}catch{return null;}
+ // Do not turn control characters or malformed metadata into misleading display labels.
+ if(!name||name.length>120||/[\u0000-\u001f\u007f]/.test(name))return null;
+ return {number:m[1],name,cell:m[3],part:m[4]};
+}
+export function readableEvidenceLocation(locator:string):string{
+ const sheet=worksheetLocation(locator);
+ if(sheet)return `시트 ${sheet.number} · ${sheet.name} · ${sheet.cell} 셀 · ${{value:'값',formula:'수식',cached:'저장된 계산값'}[sheet.part]}`;
+ const page=locator.match(/^page:(\d+)$/);if(page)return `${page[1]}페이지`;
+ return locator;
+}
+function contentIssueTitle(topic:ContentTopic,issue:ReviewIssue){
+ const labels:Record<ContentTopic,string>={document_fact:'원문 기재 내용',coverage_gap:'조회기간과 월별 내역의 차이',income_scope:'개인 사업소득의 귀속 범위',identity_difference:'자료에 기재된 이름의 차이',amount_difference:'자료 간 금액 차이',vat_uncertain:'부가세(VAT) 포함 여부',period_uncertain:'자료의 적용 기간 확인',unreadable:'원문 판독이 필요한 부분'};
+ let title=labels[topic];
+ if(topic==='document_fact'){
+  if(/^월별[^\n]*매출/.test(issue.quote))title='월별 매출 기재 내역';
+  else if(/^월별/.test(issue.quote))title='월별 금액 기재 내역';
+  else if(/조회\s*기간/.test(issue.quote))title='자료에 표시된 조회기간';
+  else if(/사업소득/.test(issue.quote))title='자료에 기재된 사업소득';
+ }
+ const sheet=worksheetLocation(issue.locator);
+ return sheet?`${sheet.name} · ${title}`:title;
+}
 export function reviewIssueGuidance(issue:ReviewIssue,documents:ReviewDocument[]){
  const topic=issue.field.startsWith('document.')?issue.field.slice(9):'';
- if(topics.includes(topic as ContentTopic))return {label:topic==='coverage_gap'?'조회 기간과 실제 내역':topic==='income_scope'?'소득의 귀속 범위':'문서 내용 대조',why:issue.evidenceAssurance==='visual_claim'?'이미지 판독 초안입니다. 인용은 모델의 판독 주장이며 원문 대조가 필요합니다.':'전송 승인된 현재 원문의 인용에 근거한 AI 검토입니다. 사실 확정이나 심사 승인이 아닙니다.',content:contentActions[topic as ContentTopic],state:topic==='document_fact'?'원문 기재사항 · 사실 확인 필요':'내용 확인 필요',next:(topic==='document_fact'||topic==='coverage_gap')&&issue.action?issue.action:contentActions[topic as ContentTopic],source:documents.find(d=>d.id===issue.sourceId)?.label??'현재 자료',quote:issue.quote,locator:issue.locator,evidence:'현재 원문 인용 · 페이지/셀 위치'+(issue.sourceVersion?' · 검수 버전 '+issue.sourceVersion:'')};
+ if(topics.includes(topic as ContentTopic))return {label:contentIssueTitle(topic as ContentTopic,issue),why:issue.evidenceAssurance==='visual_claim'?'이미지 판독 초안입니다. 인용은 모델의 판독 주장이며 원문 대조가 필요합니다.':'전송 승인된 현재 원문의 인용에 근거한 AI 검토입니다. 사실 확정이나 심사 승인이 아닙니다.',content:contentActions[topic as ContentTopic],state:topic==='document_fact'?'원문 기재사항 · 사실 확인 필요':'내용 확인 필요',next:(topic==='document_fact'||topic==='coverage_gap')&&issue.action?issue.action:contentActions[topic as ContentTopic],source:documents.find(d=>d.id===issue.sourceId)?.label??'현재 자료',quote:issue.quote,locator:readableEvidenceLocation(issue.locator),evidence:'현재 원문 인용 · 페이지/셀 위치'+(issue.sourceVersion?' · 검수 버전 '+issue.sourceVersion:'')};
  const field=fields[issue.field]??{label:'확인 항목',why:'현재 자료에서 내용을 확정할 근거를 확인합니다.',content:'해당 항목이 표시된 원문 위치'};
  const requirement=issue.requirement;
  const missing=issue.state==='missing'&&requirement?.verified===true&&!!requirement.ruleId&&!!requirement.evidenceRef&&['direct_lender','case_specific'].includes(requirement.basis);
  const state=missing?'건별 제출요건 보완':issue.state==='conflict'?'내용 불일치':issue.state==='unreadable'?'판독 불가 · 미확인':'내용 미확인';
  const next=missing?'먼저 등록 자료에 해당 내용이 있는지 확인하고, 없을 때만 아래 요건에 맞는 자료를 추가해 주세요.':issue.state==='conflict'?'기존 자료의 서로 다른 내용을 비교하고 어느 것이 현재 기준인지 확인해 주세요. 잘못되거나 오래된 자료만 교체합니다.':issue.state==='unreadable'?'기존 파일의 해당 부분을 확대해 확인하고, 읽을 수 없다면 더 선명한 파일로 교체해 주세요.':'기존 자료의 해당 위치부터 확인해 주세요. 거기에 없다면 다른 보유 자료의 근거를 연결하고, 보유하지 않은 내용만 추가로 받아 주세요.';
- return {label:field.label,why:field.why,content:field.content,state,next,source:documents.find(d=>d.id===issue.sourceId)?.label??'현재 자료 묶음',quote:issue.quote,locator:issue.locator,evidence:missing?`${requirement.basis==='direct_lender'?'직접 금융사 요구':'이 거래의 개별 조건'} · ${requirement.ruleId} · ${requirement.evidenceRef}`:issue.quote||issue.locator?'아래 원문 인용·위치를 대조해 주세요.':'원문 근거 미확인 · 자료 부족으로 확정하지 않습니다.'};
+ return {label:field.label,why:field.why,content:field.content,state,next,source:documents.find(d=>d.id===issue.sourceId)?.label??'현재 자료 묶음',quote:issue.quote,locator:readableEvidenceLocation(issue.locator),evidence:missing?`${requirement.basis==='direct_lender'?'직접 금융사 요구':'이 거래의 개별 조건'} · ${requirement.ruleId} · ${requirement.evidenceRef}`:issue.quote||issue.locator?'아래 원문 인용·위치를 대조해 주세요.':'원문 근거 미확인 · 자료 부족으로 확정하지 않습니다.'};
 }
