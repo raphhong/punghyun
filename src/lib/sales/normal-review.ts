@@ -8,7 +8,7 @@ import {sha,runReview,reviewSourceSnapshot,type Source,type Scope,type Result,ty
 import {sourceVersion} from '../admin/ai/sources';
 import {extractDocument} from '../admin/ai/document-extraction';
 import {rangeMinimizer,type TextRelease} from '../admin/ai/minimization';
-import {responsesTransport,type ApprovedConfig} from '../admin/ai/openai';
+import {responsesTransport,textFailureCode,type TextDiagnostic,type ApprovedConfig} from '../admin/ai/openai';
 import {contentContract} from '../admin/ai/content-contract';
 import {salesModelFeedback} from './model-feedback';
 import {readReviewResult} from '../admin/ai/presentation';
@@ -105,15 +105,17 @@ export function normalReviewEndpoint(input:{context:()=>Promise<NormalContext>;r
     await approvedCurrent();await input.repository.finish(context,job,result,diagnostic);await recheck();
     return Response.json(show(result),{headers});
    }
-   const model=(input.model??responsesTransport)({approved:true,dataScope:'minimized_text',reviewContract:contentContract,apiKey:input.apiKey,model:grant.model,maxOutputTokens:grant.maxOutputTokens,maxRequestBytes:grant.maxRequestBytes,timeoutMs:grant.timeoutMs});
+   diagnostic={version:1,stage:'review_preparation',billingVerified:false};const recordText=(event:TextDiagnostic)=>{diagnostic={...(diagnostic as TextDiagnostic),...event};};
+   const model=(input.model??responsesTransport)({approved:true,dataScope:'minimized_text',diagnostic:recordText,reviewContract:contentContract,apiKey:input.apiKey,model:grant.model,maxOutputTokens:grant.maxOutputTokens,maxRequestBytes:grant.maxRequestBytes,timeoutMs:grant.timeoutMs});
    const result=await runReview({scope:async()=>(await approvedCurrent()).scope,sources:async()=>(await approvedCurrent()).sources,
     extract:input.extract??(async s=>(await extractDocument(s,request.signal)).segments),minimize:rangeMinimizer(grant.release),model,
     reserve:async(binding,key)=>{await recheck();job=await input.repository.reserve(original,grant,key,binding);return !!job;},policyVersion:grant.release.policyVersion},context.sources.map(s=>s.id),body.idempotencyKey,request.signal);
    await approvedCurrent();if(!job)throw Error('source_unreadable');
-   await input.repository.finish(context,job,result);await recheck();
+   recordText({version:1,stage:'result_persistence',billingVerified:false});await input.repository.finish(context,job,result,{...(diagnostic as TextDiagnostic),stage:'completed'});await recheck();
    return Response.json(show(result),{headers});
   }catch(e){
    // Any dispatched/reserved uncertain result keeps its reservation. No automatic retry/refund.
+   if(diagnostic&&(diagnostic as TextDiagnostic).version===1){const d=diagnostic as TextDiagnostic;diagnostic={...d,errorCode:d.errorCode??textFailureCode(e)};}
    if(job&&context)try{await input.repository.finish(context,job,null,diagnostic);}catch{}
    const allowed=['forbidden','invalid_request','source_changed','source_unavailable','source_unreadable','sensitive_document','document_selection_required','transmission_approval_required','provider_not_configured','request_already_reserved','provider_outcome_unknown','ocr_runtime_unavailable','unsupported_format','storage_not_connected','visual_release_required','invalid_image','unsupported_pdf','visual_input_limit','image_orientation_review_required','minimization_required','sensitive_text'];
    const code=e instanceof Error&&allowed.includes(e.message)?e.message:'review_unavailable';
