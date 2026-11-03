@@ -1,4 +1,4 @@
-import {contentActions} from '../admin/ai/content-contract';
+import {contentActions,reconcileCoverage,monthlyCoverageProse,monthlyEvidenceFor} from '../admin/ai/content-contract';
 import type {Result} from '../admin/ai/review';
 type Issue={sourceVersion?:string;sourceHash?:string;evidenceAssurance?:'text_match'|'visual_claim';sourceId:string;field:string;state:'unknown'|'unreadable'|'conflict';quote:string;locator:string;action:string};
 const priority={unknown:0,unreadable:1,conflict:2};
@@ -20,6 +20,6 @@ export function salesModelFeedback(results:Result[],documentIds:string[]):Issue[
    else issues.push({sourceId:id,field:s.field,state:s.kind,quote:'',locator:'',action:(s.sourceId?'':'관련 원문 위치 미확인. ')+action[s.kind]});
   }
  }
- for(const r of results)for(const o of r.contentReview?.observations??[])for(const e of o.evidence){if(!documentIds.includes(e.sourceId))continue;issues.push({sourceVersion:e.version,sourceHash:e.sha256,evidenceAssurance:e.assurance,sourceId:e.sourceId,field:'document.'+o.topic,state:'unknown',quote:e.quote,locator:e.locator,action:(e.assurance==='visual_claim'?'이미지 판독 초안 · 원문 확인 필요. ':'')+contentActions[o.topic]});}
+ for(const r of results)for(const o of reconcileCoverage(r.contentReview?.observations??[]))for(const e of o.evidence){if(!documentIds.includes(e.sourceId))continue;issues.push({sourceVersion:e.version,sourceHash:e.sha256,evidenceAssurance:e.assurance,sourceId:e.sourceId,field:'document.'+o.topic,state:'unknown',quote:e.quote,locator:e.locator,action:(e.assurance==='visual_claim'?'이미지 판독 초안 · 원문 확인 필요. ':'')+((o.topic==='coverage_gap'||o.topic==='document_fact'&&/^월별/.test(e.quote))?monthlyCoverageProse(monthlyEvidenceFor((r.contentReview?.observations??[]).flatMap(x=>x.evidence),e))??contentActions[o.topic]:contentActions[o.topic])});}
  return issues;
 }
