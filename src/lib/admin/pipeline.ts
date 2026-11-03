@@ -292,6 +292,7 @@ export const TRANSACTION_DOCS: DocItem[] = [
 export function purchaseIntentRequirement(
   rows: readonly { doc_key: string; file_path?: string | null; checked?: boolean | null }[],
   lookupFailed = false,
+  audience: "staff" | "customer" = "staff",
 ) {
   const received = rows.some(row => row.doc_key === "purchase_intent" && !!row.file_path?.trim());
   const state = lookupFailed ? "unknown" : received ? "received" : "not_received";
@@ -299,9 +300,15 @@ export function purchaseIntentRequirement(
     key: "purchase_intent" as const, authority: "punghyun" as const, required: true as const,
     state, contentReview: "unconfirmed" as const,
     message: state === "unknown"
-      ? "매입의향서 · 풍현 필수 · 수령 여부 미확인. 자료 조회 후 기존 파일이 있는지 확인해 주세요."
+      ? audience === "customer"
+        ? "매입의향서 · 풍현 필수 · 등록 여부를 확인할 수 없습니다. 잠시 후 다시 확인하거나 담당자에게 문의해 주세요."
+        : "매입의향서 · 풍현 필수 · 수령 여부 미확인. 자료 조회 후 기존 파일이 있는지 확인해 주세요."
       : state === "received"
-        ? "매입의향서 · 풍현 필수 · 파일 수령. 기존 파일을 사용하며 다시 요청하지 않습니다. 내용 검토 여부는 별도 확인이 필요합니다."
-        : "매입의향서 · 풍현 필수 · 등록된 파일이 없습니다. 이미 받은 자료가 있다면 매입의향서 항목에 등록하고, 아직 받지 않았다면 제출을 요청해 주세요.",
+        ? audience === "customer"
+          ? "매입의향서 · 풍현 필수 · 파일이 등록되어 있습니다. 다시 업로드할 필요가 없습니다. 내용 검토 여부는 담당자에게 확인해 주세요."
+          : "매입의향서 · 풍현 필수 · 파일 수령. 기존 파일을 사용하며 다시 요청하지 않습니다. 내용 검토 여부는 별도 확인이 필요합니다."
+        : audience === "customer"
+          ? "매입의향서 · 풍현 필수 · 아직 등록된 파일이 없습니다. 아래에서 매입의향서 파일을 선택해 업로드해 주세요. 이미 제출하셨다면 담당자에게 등록 여부를 확인해 주세요."
+          : "매입의향서 · 풍현 필수 · 등록된 파일이 없습니다. 이미 받은 자료가 있다면 매입의향서 항목에 등록하고, 아직 받지 않았다면 제출을 요청해 주세요.",
   };
 }

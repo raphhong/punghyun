@@ -183,9 +183,9 @@ export default async function PublicSubmitPage({
 
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
         <h2 className="text-base font-semibold text-navy-900">매입의향서 · 풍현 필수</h2>
-        <p className="text-sm text-navy-500">{purchaseIntentRequirement(docRows ?? [], !!docsError).message}</p>
+        <p className="text-sm text-navy-500">{purchaseIntentRequirement(docRows ?? [], !!docsError, "customer").message}</p>
         <p className="text-sm text-navy-500">풍현 자체 제출 요건입니다. 파일 수령은 내용 검토나 심사 승인·계약 완료를 뜻하지 않습니다.</p>
-        <DocUpload docs={PURCHASE_INTENT_DOCS} docMap={docMap} signedMap={signedMap} token={token} />
+        <DocUpload docs={PURCHASE_INTENT_DOCS} docMap={docMap} signedMap={signedMap} token={token} lookupFailed={!!docsError} />
       </section>
       {/* 서류 업로드 */}
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
@@ -195,7 +195,7 @@ export default async function PublicSubmitPage({
             각 항목의 파일을 선택하고 업로드를 눌러 주세요.
           </p>
         </div>
-        <DocUpload docs={docsForType(SCREENING_2_DOCS, customer.hospital_type)} docMap={docMap} signedMap={signedMap} token={token} />
+        <DocUpload docs={docsForType(SCREENING_2_DOCS, customer.hospital_type)} docMap={docMap} signedMap={signedMap} token={token} lookupFailed={!!docsError} />
       </section>
 
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">
@@ -221,6 +221,7 @@ export default async function PublicSubmitPage({
           docMap={docMap}
           signedMap={signedMap}
           token={token}
+          lookupFailed={!!docsError}
         />
       </section>
 
@@ -236,11 +237,13 @@ function DocUpload({
   docMap,
   signedMap,
   token,
+  lookupFailed = false,
 }: {
   docs: DocItem[];
   docMap: Map<string, Partial<CustomerDocument>>;
   signedMap: Map<string, string>;
   token: string;
+  lookupFailed?: boolean;
 }) {
   return (
     <ul className="space-y-3">
@@ -251,7 +254,8 @@ function DocUpload({
           : undefined;
         return (
           <PublicDocUpload
-            key={doc.key}
+            key={JSON.stringify([doc.key, row?.file_path, lookupFailed])}
+            lookupFailed={lookupFailed}
             token={token}
             docKey={doc.key}
             category={doc.category}

@@ -213,7 +213,7 @@ ${docLines}
 
       <Card title="매입의향서 · 풍현 필수" desc={purchaseIntentRequirement(docs, !!docsRes.error).message}>
         <p className="mb-3 text-sm text-navy-500">풍현 자체 제출 요건입니다. 비즈마켓의 직접 요구나 심사 승인·계약 완료를 의미하지 않습니다.</p>
-        <DocList docs={PURCHASE_INTENT_DOCS} docMap={docMap} signedMap={signedMap} customerId={customer.id} />
+        <DocList docs={PURCHASE_INTENT_DOCS} docMap={docMap} signedMap={signedMap} customerId={customer.id} lookupFailed={!!docsRes.error} />
       </Card>
       {/* 서류 현황 */}
       <Card title="일반렌탈 2차 스크리닝 서류 (기존 자료)">
@@ -222,6 +222,7 @@ ${docLines}
           docMap={docMap}
           signedMap={signedMap}
           customerId={customer.id}
+          lookupFailed={!!docsRes.error}
         />
         <section className="mt-4 space-y-3 border-t border-navy-200 pt-4" aria-label="기타 서류 (선택)">
           <h3 className="text-sm font-semibold text-navy-800">기타 서류 (선택)</h3>
@@ -261,6 +262,7 @@ ${docLines}
             docMap={docMap}
             signedMap={signedMap}
             customerId={customer.id}
+          lookupFailed={!!docsRes.error}
           />
         </div>
       </Card>
@@ -288,17 +290,19 @@ function DocList({
   docMap,
   signedMap,
   customerId,
+  lookupFailed = false,
 }: {
   docs: DocItem[];
   docMap: Map<string, CustomerDocument>;
   signedMap: Map<string, string>;
   customerId: string;
+  lookupFailed?: boolean;
 }) {
   return (
     <ul className="space-y-2">
       {docs.map((doc) => {
         const row = docMap.get(doc.key);
-        const done = !!row?.file_path;
+        const done = !lookupFailed && !!row?.file_path;
         const url = row?.file_path ? signedMap.get(row.file_path) : undefined;
         return (
           <li
@@ -306,13 +310,15 @@ function DocList({
             className="flex flex-wrap items-center gap-2 rounded-xl border border-navy-100 px-3 py-2.5"
           >
             <span
+              aria-hidden="true"
               className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-                done ? "bg-brand-500 text-white" : "bg-navy-100 text-transparent"
+                done ? "bg-brand-500 text-white" : "bg-navy-100 text-navy-500"
               }`}
             >
-              ✓
+              {done ? "✓" : "○"}
             </span>
             <span className="text-sm text-navy-800">{doc.label}</span>
+            <span className="text-xs text-navy-500">{lookupFailed ? "수령 여부 미확인" : done ? "파일 수령 · 내용 검토는 별도" : "파일 미등록"}</span>
             <div className="ml-auto flex items-center gap-2">
               {url && (
                 <span className="inline-flex gap-2">

@@ -15,6 +15,7 @@ export function PublicDocUpload({
   hint,
   done: initialDone,
   fileUrl,
+  lookupFailed = false,
 }: {
   token: string;
   docKey: string;
@@ -23,6 +24,7 @@ export function PublicDocUpload({
   hint?: string;
   done: boolean;
   fileUrl?: string;
+  lookupFailed?: boolean;
 }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
@@ -68,20 +70,21 @@ export function PublicDocUpload({
     }
   }
 
-  const done = status === "done";
+  const done = !lookupFailed && (initialDone || status === "done");
 
   return (
     <li className="rounded-xl border border-navy-100 p-3">
       <div className="mb-2 flex items-center gap-2">
         <span
+          aria-hidden="true"
           className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-            done ? "bg-brand-500 text-white" : "bg-navy-100 text-transparent"
+            done ? "bg-brand-500 text-white" : "bg-navy-100 text-navy-500"
           }`}
         >
-          ✓
+          {done ? "✓" : "○"}
         </span>
         <span className="text-sm font-medium text-navy-800">{label}</span>
-        {done && <span className="text-xs text-brand-600">업로드됨</span>}
+        <span className="text-xs text-navy-500">{lookupFailed ? "등록 여부 미확인" : done ? "파일 등록됨 · 내용 검토는 별도" : "파일 미등록"}</span>
         {fileUrl && (
           <span className="ml-auto inline-flex gap-2">
             <a
