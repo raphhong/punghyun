@@ -1,3 +1,4 @@
+import { LegacyTaxDocument } from "@/components/LegacyTaxDocument";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -7,6 +8,7 @@ import {
   PURCHASE_INTENT_DOCS,
   purchaseIntentRequirement,
   SCREENING_2_DOCS,
+  LEGACY_TAX_DOC,
   SCREENING_3_DOCS,
   docsForType,
   type DocItem,
@@ -196,6 +198,7 @@ export default async function PublicSubmitPage({
           </p>
         </div>
         <DocUpload docs={docsForType(SCREENING_2_DOCS, customer.hospital_type)} docMap={docMap} signedMap={signedMap} token={token} lookupFailed={!!docsError} />
+        <LegacyTaxDocument row={docMap.get(LEGACY_TAX_DOC.key)} signedMap={signedMap} />
       </section>
 
       <section className="mt-6 space-y-4 rounded-2xl border border-navy-100 bg-white p-5">

@@ -122,10 +122,16 @@ export const SCREENING_2_DOCS: DocItem[] = [
     hint: "카드사 또는 여신금융협회에서 카드매출 내역 발급",
   },
   {
-    key: "tax_payment_cert",
-    label: "국세 및 지방세 완납 증명서",
+    key: "national_tax_payment_cert",
+    label: "국세 완납 증명서",
     category: "screening_2",
-    hint: "국세: 홈택스 / 지방세: 위택스(wetax.go.kr)에서 발급",
+    hint: "홈택스(hometax.go.kr)에서 발급",
+  },
+  {
+    key: "local_tax_payment_cert",
+    label: "지방세 완납 증명서",
+    category: "screening_2",
+    hint: "위택스(wetax.go.kr)에서 발급",
   },
   {
     key: "income_cert_2y",
@@ -134,6 +140,13 @@ export const SCREENING_2_DOCS: DocItem[] = [
     hint: "홈택스(민원증명)에서 발급",
   },
 ];
+
+// 기존 단일 키는 조회용으로 보존. 두 필수 증명서의 수령을 대신하지 않음.
+export const LEGACY_TAX_DOC: DocItem = {
+  key: "tax_payment_cert",
+  label: "국세·지방세 완납 증명서 (기존 통합 항목)",
+  category: "screening_2",
+};
 
 export const SCREENING_3_DOCS: DocItem[] = [
   {

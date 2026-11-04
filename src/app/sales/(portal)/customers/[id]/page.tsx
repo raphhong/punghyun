@@ -1,5 +1,6 @@
 import NormalReviewPanel from '@/components/sales/NormalReviewPanel';
 import SalesReviewPanel from '@/components/sales/SalesReviewPanel';
+import { LegacyTaxDocument } from "@/components/LegacyTaxDocument";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
@@ -10,6 +11,7 @@ import {
   purchaseIntentRequirement,
   HOSPITAL_TYPES,
   SCREENING_2_DOCS,
+  LEGACY_TAX_DOC,
   SCREENING_3_DOCS,
   docsForType,
   stageLabel,
@@ -224,6 +226,7 @@ ${docLines}
           customerId={customer.id}
           lookupFailed={!!docsRes.error}
         />
+        <LegacyTaxDocument row={docMap.get(LEGACY_TAX_DOC.key)} signedMap={signedMap} />
         <section className="mt-4 space-y-3 border-t border-navy-200 pt-4" aria-label="기타 서류 (선택)">
           <h3 className="text-sm font-semibold text-navy-800">기타 서류 (선택)</h3>
           <p className="text-xs text-navy-500">필요한 경우에만 첨부하세요. 필수 제출·서류 충족률·다음 단계 진행 조건에 포함되지 않습니다.</p>

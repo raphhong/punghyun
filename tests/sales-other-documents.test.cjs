@@ -110,6 +110,7 @@ test('real sales detail page renders the sales uploader only for its approved as
       'next/headers':{headers:async()=>new Map()},
       'next/navigation':{notFound:()=>{throw Error('not found')}},
       'next/link':({children})=>React.createElement('a',null,children),
+      '@/components/LegacyTaxDocument':{LegacyTaxDocument:noop},
       '@/components/admin/ShareLink':{ShareLink:noop},
       '@/components/admin/ShareMessage':{ShareMessage:noop},
       '@/components/sales/SalesDocUpload':{SalesDocUpload:noop},

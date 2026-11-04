@@ -5,6 +5,7 @@ import { otherDocumentFilename } from "@/lib/admin/other-document-path";
 import { createClient } from "@/lib/supabase/server";
 import {
   SCREENING_2_DOCS,
+  LEGACY_TAX_DOC,
   SCREENING_3_DOCS,
   PURCHASE_INTENT_DOCS,
   CONTRACT_DOCS,
@@ -16,6 +17,7 @@ import {
 const LABELS = new Map(
   [
     ...SCREENING_2_DOCS,
+    LEGACY_TAX_DOC,
     ...SCREENING_3_DOCS,
     ...PURCHASE_INTENT_DOCS,
     ...CONTRACT_DOCS,

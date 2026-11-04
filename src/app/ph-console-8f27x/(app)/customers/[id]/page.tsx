@@ -1,4 +1,5 @@
 import NormalReviewPanel from "@/components/sales/NormalReviewPanel";
+import { LegacyTaxDocument } from "@/components/LegacyTaxDocument";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -30,6 +31,7 @@ import {
   PURCHASE_INTENT_DOCS,
   purchaseIntentRequirement,
   SCREENING_2_DOCS,
+  LEGACY_TAX_DOC,
   SCREENING_3_DOCS,
   docsForType,
   nextStage,
@@ -145,6 +147,7 @@ export default async function CustomerDetailPage({
   const docLabelMap = new Map(
     [
       ...SCREENING_2_DOCS,
+      LEGACY_TAX_DOC,
       ...SCREENING_3_DOCS,
       ...PURCHASE_INTENT_DOCS,
       ...CONTRACT_DOCS,
@@ -360,6 +363,7 @@ ${docLines}
         badge={openScr2 ? "현재 단계" : undefined}
       >
         <DocList docs={screening2} customerId={id} docMap={docMap} signedMap={signedMap} />
+        <LegacyTaxDocument row={docMap.get(LEGACY_TAX_DOC.key)} signedMap={signedMap} />
         <section className="mt-4 space-y-3 border-t border-navy-200 pt-4" aria-label="기타 서류 (선택)">
           <h3 className="text-sm font-semibold text-navy-800">기타 서류 <span className="text-xs font-normal text-navy-500">(선택)</span></h3>
           <p className="text-xs text-navy-500">필요한 경우에만 첨부하세요. 필수 제출·서류 충족률·다음 단계 진행 조건에 포함되지 않습니다.</p>
