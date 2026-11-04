@@ -36,7 +36,7 @@ export function normalSalesSources(db:SupabaseClient,storage:()=>SupabaseClient,
   const agent=await db.from('sales_agents').select('id,status').eq('user_id',auth.data.user.id).maybeSingle();
   if(agent.error||agent.data?.status!=='approved')throw Error('forbidden');
   const customer=await db.from('customers').select('id,sales_agent_id').eq('id',customerId).maybeSingle();
-  if(customer.error||!customer.data)throw Error('forbidden');
+  if(customer.error||!customer.data||customer.data.sales_agent_id!==agent.data.id)throw Error('forbidden');
   const docs=await db.from('customer_documents').select('id,file_path,uploaded_at,device_id,category,doc_key').eq('customer_id',customerId).order('id');
   if(docs.error)throw Error('source_unavailable');
   const available=(docs.data??[]).filter(d=>d.file_path);
@@ -49,9 +49,10 @@ export function normalSalesSources(db:SupabaseClient,storage:()=>SupabaseClient,
   const m=await metadata();if(m.rows.length>8)throw Error('document_selection_required');
   const sources:Source[]=[],excluded:{documentId:string;code:string}[]=[];
   for(const d of m.rows){
-   if(typeof d.file_path!=='string'||!d.file_path.startsWith(customerId+'/')||!d.uploaded_at)throw Error('source_changed');
+   if(typeof d.file_path!=='string'||!d.file_path.startsWith(customerId+'/')||d.file_path.split('/').some((part:string)=>part==='.'||part==='..')||/[\\%?#]/.test(d.file_path)||!d.uploaded_at)throw Error('source_changed');
    // These documents must never enter an automatic AI batch, even if upload itself is allowed.
-   if(/identity|id_card|resident|passport|신분|주민|여권/i.test(d.doc_key+' '+d.category)){excluded.push({documentId:d.id,code:'sensitive_document_not_sent'});continue;}
+   if(/rep_id|identity|id_card|resident|registration|passport|bank|account|health|medical|patient|신분|주민|여권|등본|통장|계좌|건강|진료/i.test(d.doc_key+' '+d.category)){excluded.push({documentId:d.id,code:'sensitive_document_not_sent'});continue;}
+   if(JSON.stringify(m)!==JSON.stringify(await metadata()))throw Error('source_changed');
    const s=storage().storage.from('customer-docs');
    const info=await s.info(d.file_path);if(info.error||!info.data||typeof info.data.size!=='number'||info.data.size<1||info.data.size>8*1024*1024)throw Error('source_unavailable');
    const file=await s.download(d.file_path);if(file.error||!file.data||file.data.size>8*1024*1024)throw Error('source_unavailable');

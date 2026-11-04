@@ -137,7 +137,7 @@ ${docLines}
 
   return (
     <div className="space-y-6">
-      {agent?.status === 'approved' && customer.sales_agent_id === agent.id && (process.env.SALES_AI_REVIEW_ENABLED==='normal-product-v1'?<NormalReviewPanel customerId={id} documents={reviewDocuments} purchaseIntentNotice={purchaseIntentRequirement(docs, !!docsRes.error).message}/>:<SalesReviewPanel customerId={id} documents={reviewDocuments}/>)}
+      {agent?.status === 'approved' && customer.sales_agent_id === agent.id && (process.env.SALES_AI_REVIEW_ENABLED==='normal-product-v1'?<NormalReviewPanel customerId={id} operatorLabel={agent.name} documents={reviewDocuments} purchaseIntentNotice={purchaseIntentRequirement(docs, !!docsRes.error).message}/>:<SalesReviewPanel customerId={id} documents={reviewDocuments}/>)}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">
