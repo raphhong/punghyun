@@ -1,3 +1,4 @@
+import NormalReviewPanel from "@/components/sales/NormalReviewPanel";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -90,6 +91,8 @@ export default async function CustomerDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const reviewUser = (await supabase.auth.getUser()).data.user;
+  const reviewAdmin = reviewUser ? await supabase.from("admins").select("user_id").eq("user_id",reviewUser.id).maybeSingle() : null;
 
   // 세 쿼리 모두 route param(id)에만 의존 → 병렬 실행으로 왕복 절감.
   const [customerRes, docsRes, devicesRes] = await Promise.all([
@@ -401,6 +404,7 @@ ${docLines}
         open
       >
         <DocGallery customerId={id} items={galleryItems.filter(item => !isOtherDocument(item.key))} deleteAction={deleteDocument} />
+        {reviewUser && reviewAdmin?.data && !reviewAdmin.error && <NormalReviewPanel customerId={id} apiBase={"/api/admin/customers/"+encodeURIComponent(id)+"/ai-review"} operatorLabel={reviewUser.email??reviewUser.id} documents={docs.filter(d=>d.file_path).map(d=>({id:d.id,label:otherDocumentFilename(d.file_path!),version:d.uploaded_at??""}))} purchaseIntentNotice={purchaseIntentRequirement(docs,!!docsRes.error).message} />}
       </CollapsibleCard>
 
       {/* 거래 진정성 증빙 서류 — 진정한 매매+임대차 입증 (내부 관리) */}
