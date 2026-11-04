@@ -1,5 +1,5 @@
 import type {TransmissionCeiling} from './normal-consent';
-export type Readiness={ready:boolean;reasons:string[];notice:string};
+export type Readiness={localOcr?:boolean;ready:boolean;reasons:string[];notice:string};
 export function salesReviewReadiness(b:Record<string,unknown>|null,ceiling:TransmissionCeiling|null,hasProvider:boolean,now=Date.now(),monthly?:Record<string,unknown>|null):Readiness{
  const reasons:string[]=[];const p=b?.owner_policy as Record<string,unknown>|undefined;
  if(!b||!ceiling)reasons.push('전송 설정이 준비되지 않았습니다.');

@@ -1,0 +1,1 @@
+const deny=()=>{throw Error('NETWORK_FORBIDDEN_IN_OCR_TEST');};for(const m of ['http','https']){require(m).request=deny;require(m).get=deny;}require('net').connect=deny;require('net').createConnection=deny;global.fetch=deny;

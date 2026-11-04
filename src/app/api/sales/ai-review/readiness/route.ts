@@ -1,3 +1,4 @@
+import {localOcrEnabled} from '@/lib/admin/ai/local-ocr-config';
 import {createClient} from '@/lib/supabase/server';
 import {createAdminClient} from '@/lib/supabase/admin';
 import {transmissionCeiling} from '@/lib/sales/normal-consent';
@@ -11,6 +12,6 @@ export async function GET(){
  const r=await admin.from('sales_ai_budgets').select('allocation_approved,allocation_expires_at,policy_revision,owner_policy,max_calls,reserved_calls,max_microusd,reserved_microusd').eq('singleton',true).single();
  const monthly=await admin.rpc('sales_ai_monthly_usage');
  if(r.error||monthly.error)throw Error('unavailable');
- return Response.json(salesReviewReadiness(r.data,transmissionCeiling(process.env),!!process.env.OPENAI_API_KEY,Date.now(),monthly.data),{headers});
+ return Response.json({...salesReviewReadiness(r.data,transmissionCeiling(process.env),!!process.env.OPENAI_API_KEY,Date.now(),monthly.data),localOcr:localOcrEnabled(process.env)},{headers});
  }catch{return Response.json({ready:false,reasons:['검수 준비 상태를 확인하지 못했습니다. 담당자 권한과 연결 상태를 확인하세요.'],notice:'고객파일이나 AI 제공자를 호출하지 않았습니다.'},{status:403,headers});}
 }

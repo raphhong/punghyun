@@ -1,3 +1,4 @@
+import {localOcrEnabled} from './local-ocr-config';
 import {extractDocument} from './document-extraction';
 import type {Source,Segment} from './review';
 /** Conservative labelled business lines only; never whole files or unlabelled prose.
@@ -12,7 +13,8 @@ export function adminBusinessSegments(segments:Segment[]):Segment[]{
  }));
 }
 export async function extractAdminBusinessFields(source:Source){
- if(!['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(source.mime))throw Error('unsupported_format');
- const parsed=await extractDocument(source);const out=adminBusinessSegments(parsed.segments);
+ const ocr=localOcrEnabled(process.env);
+ if(!['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',...(ocr?['image/png','image/jpeg']:[])].includes(source.mime))throw Error('unsupported_format');
+ const parsed=await extractDocument(source,undefined,ocr?{ocr:async (s,signal)=>(await import('./local-ocr')).localDocumentOcr(s,signal)}:{});const out=adminBusinessSegments(parsed.segments);
  if(!out.length)throw Error('source_unreadable');return out;
 }
