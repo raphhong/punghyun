@@ -6,8 +6,14 @@ export function otherDocumentPath(customerId: string, key: string, filename: str
 }
 
 export function otherDocumentFilename(path: string): string {
-  const encoded = path.split("/").pop()?.split(".")[0] ?? "";
-  return Buffer.from(encoded, "base64url").toString("utf8");
+  const parts = path.split('/');
+  const basename = parts.at(-1) ?? '';
+  // Ordinary uploads use docKey-timestamp.ext, never base64. Decode only our encoded layout.
+  if (!isOtherDocument(parts.at(-2) ?? '')) return basename || '파일 이름 확인 필요';
+  const encoded = basename.split('.')[0];
+  const decoded = Buffer.from(encoded, 'base64url').toString('utf8');
+  if (!decoded || /[\u0000-\u001f\u007f\ufffd]/.test(decoded) || Buffer.from(decoded, 'utf8').toString('base64url') !== encoded) return '파일 이름 확인 필요';
+  return decoded;
 }
 
 export function validOtherDocumentPath(customerId: string, key: string, path: string): boolean {
