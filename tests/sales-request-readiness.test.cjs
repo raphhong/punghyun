@@ -21,3 +21,45 @@ test('sales UI preserves upload flow, identifies requester, and uses sales readi
  const page=fs.readFileSync('src/app/sales/(portal)/customers/[id]/page.tsx','utf8');assert(page.includes('operatorLabel={agent.name}'));assert(page.includes('SalesDocUpload'));
  for(const f of ['route.ts','consent/route.ts']){const route=fs.readFileSync('src/app/api/sales/customers/[id]/ai-review/'+f,'utf8');assert(route.includes("dataClass==='customer'"));assert(route.includes('extractAdminBusinessFields'));}
 });
+
+test('shared provider cap does not release exhausted app allocation or erase UNKNOWN reservations',()=>{
+ const b=budget();b.max_calls=3;b.max_microusd=1500000;
+ const before={reserved_calls:b.reserved_calls,reserved_microusd:b.reserved_microusd};
+ assert.equal(salesReviewReadiness(b,ceiling,true,now).ready,false);
+ // One local synthetic reservation slot; neither reserved counter is reset.
+ b.max_calls=b.reserved_calls+1;b.max_microusd=b.reserved_microusd+500000;
+ assert.equal(salesReviewReadiness(b,ceiling,true,now).ready,true);
+ assert.deepEqual({reserved_calls:b.reserved_calls,reserved_microusd:b.reserved_microusd},before);
+ b.reserved_calls++;b.reserved_microusd+=500000;
+ assert.equal(salesReviewReadiness(b,ceiling,true,now).ready,false);
+});
+test('customer self-selected files need exact fresh preview consent without owner hash preselection',async()=>{
+ const {normalConsentEndpoint,ownerPolicy,transmissionCeiling}=load('src/lib/sales/normal-consent.ts');
+ const {sha,reviewSourceSnapshot}=load('src/lib/admin/ai/review.ts');
+ let actor='sales-a',customer='customer-a',version='1',text='장비명: 합성 의료장비';let saved=0;
+ const mime='application/pdf';
+ const ceiling=transmissionCeiling({SALES_AI_TRANSMISSION_CEILING:JSON.stringify({dataClass:'customer',allowedMime:[mime],allowedCategories:['quote'],allowedHashes:[],expiresAt:Date.now()+600000})});assert(ceiling);
+ const record={id:'policy',revision:1,policy:ownerPolicy({active:true,expiresAt:ceiling.expiresAt,allowedMime:[mime],allowedCategories:['quote'],maxDocuments:8},{id:'policy',revision:0,policy:null},ceiling)};
+ const context=async()=>{const scope={actorId:actor,customerId:customer,caseId:customer,tenantId:'punghyun',revision:'assignment'};const bytes=Buffer.from(text),sources=[{id:'doc',bytes,version,sha256:sha(bytes),mime,customerId:customer,assetId:null}];return {scope,sources,snapshot:reviewSourceSnapshot(scope,sources),files:[{id:'doc',label:'합성.pdf',category:'quote'}]};};
+ const extract=async s=>[{id:'line',sourceId:s.id,version:s.version,sha256:s.sha256,assetId:null,text,locator:'page 1'}];
+ const endpoint=normalConsentEndpoint({context,ceiling,extract,store:{policy:async()=>record,register:async()=>{saved++;return 'grant';},revoke:async()=>{}}});
+ const req=b=>new Request('https://local.test/consent',b?{method:'POST',headers:{origin:'https://local.test'},body:JSON.stringify(b)}:{});
+ const p=await(await endpoint(req())).json();assert.equal(p.provider,'OpenAI API');assert.equal(saved,0);
+ const b={confirmed:true,snapshot:p.snapshot,previewHash:p.previewHash,policyId:p.policyId,policyRevision:p.policyRevision};
+ assert.equal((await endpoint(req(b))).status,200);
+ for(const change of [()=>{customer='customer-b';},()=>{customer='customer-a';actor='sales-b';},()=>{actor='sales-a';version='2';},()=>{version='1';text='장비명: 합성 제조장비';}]){change();assert.equal((await endpoint(req(b))).status,409);}
+ assert.equal(saved,1);
+});
+test('unreadable scanned customer document cannot become executable or whole visual',async()=>{
+ const {inspectMixed}=load('src/lib/sales/normal-mixed.ts');const {sha}=load('src/lib/admin/ai/review.ts');
+ const bytes=Buffer.from('synthetic scanned placeholder');const s={id:'scan',version:'1',sha256:sha(bytes),bytes,mime:'application/pdf',customerId:'synthetic'};
+ const r=await inspectMixed({sources:[s]},false,Date.now()+60000,async()=>{throw Error('ocr_runtime_unavailable');});
+ assert.equal(r.segments.length,0);assert.equal(r.manifest.visuals.length,0);assert.equal(r.manifest.unreadable.length,1);assert.equal(r.disclosures[0].mode,'unreadable');
+});
+test('monthly readiness uses DB monthly aggregate instead of exhausted lifetime pilot counters',()=>{
+ const b=budget();b.max_calls=b.reserved_calls;b.max_microusd=b.reserved_microusd;
+ assert.equal(salesReviewReadiness(b,ceiling,true,now,{mode:'monthly',limitMicrousd:200000000,usedMicrousd:1500000}).ready,true);
+ for(const usage of [null,{}, {mode:'monthly',limitMicrousd:200000001,usedMicrousd:0},{mode:'monthly',limitMicrousd:200000000,usedMicrousd:199500001},{mode:'monthly',limitMicrousd:200000000,usedMicrousd:-1}])assert.equal(salesReviewReadiness(b,ceiling,true,now,usage).ready,false);
+ assert.equal(salesReviewReadiness(b,ceiling,true,now,{mode:'legacy'}).ready,false);
+ const r=JSON.stringify(salesReviewReadiness(b,ceiling,true,now,{mode:'monthly',limitMicrousd:200000000,usedMicrousd:1500000}));assert(!r.includes('1500000'));assert(!r.includes('200000000'));
+});

@@ -30,7 +30,7 @@ export function normalConsentStore(server:SupabaseClient){
    const row={id:grant.id,budget_id:record.id,policy_revision:record.revision,actor_id:c.scope.actorId,customer_id:c.scope.customerId,snapshot:c.snapshot,scope_hash:sha(JSON.stringify(c.scope)),active:true,expires_at:new Date(grant.release.expiresAt).toISOString(),release:{...grant.release,...(grant.mixed?{mixed:grant.mixed,visualLimits:grant.visualLimits}:{})},consent,model:grant.model,max_output_tokens:grant.maxOutputTokens,max_request_bytes:grant.maxRequestBytes,timeout_ms:grant.timeoutMs,reserve_microusd:500000};
    const saved=await server.from('sales_ai_transmission_grants').insert(row);if(saved.error){const existing=await server.from('sales_ai_transmission_grants').select('id,release,consent,active').eq('actor_id',row.actor_id).eq('customer_id',row.customer_id).eq('snapshot',row.snapshot).eq('scope_hash',row.scope_hash).eq('policy_revision',row.policy_revision).maybeSingle();if(existing.error||!existing.data?.active||existing.data.consent?.previewHash!==consent.previewHash||existing.data.release?.expiresAt<=Date.now())throw Error('consent_not_saved');return existing.data.id as string;}return grant.id;
   },
-  async revoke(id:string){const r=await server.from('sales_ai_transmission_grants').update({active:false}).eq('id',id);if(r.error)throw Error('consent_not_saved');}
+  async revoke(id:string,c:NormalContext){const r=await server.rpc('sales_ai_revoke_consent',{p_grant:id,p_actor:c.scope.actorId,p_customer:c.scope.customerId,p_snapshot:c.snapshot,p_scope:sha(JSON.stringify(c.scope))});if(r.error||r.data!==true)throw Error('consent_not_saved');}
  };
 }
 export type ConsentStore=ReturnType<typeof normalConsentStore>;
@@ -61,7 +61,7 @@ export async function consentPreview(c:NormalContext,record:PolicyRecord,ceiling
  return {segments,consent,grant,view:{executable,blockingReason,disclosures,snapshot:c.snapshot,previewHash:consent.previewHash,policyId:policy.id,policyRevision:policy.revision,expiresAt:consent.expiresAt,provider:'OpenAI API',dataClass:policy.dataClass,files:c.files.map(f=>({...f,sha256:c.sources.find(s=>s.id===f.id)!.sha256,version:c.sources.find(s=>s.id===f.id)!.version})),segments:segments.map(s=>({id:s.id,sourceId:s.sourceId,locator:s.locator,text:s.text})),notice:manifest.visuals.length?'전체 이미지 또는 PDF의 모든 페이지를 OpenAI API에 전송합니다. 가림·자동 개인정보 삭제를 하지 않습니다. 현재는 별도 허용된 합성 원문만 가능합니다. 판독값·인용은 원문 확인이 필요합니다.': '표시된 텍스트만 OpenAI API로 보냅니다. 개인식별정보가 보이면 취소하고 자료를 수정하세요. 검수는 금융 승인이나 자료 완비 확인이 아닙니다.'}};
 }
 export function normalConsentEndpoint(input:{context:()=>Promise<NormalContext>;store:ConsentStore;ceiling:TransmissionCeiling|null;extract?:Parameters<typeof consentPreview>[3]}){
- return async(request:Request)=>{const headers={'Cache-Control':'no-store'};let registered:string|undefined;try{
+ return async(request:Request)=>{const headers={'Cache-Control':'no-store'};let registered:string|undefined,registeredContext:NormalContext|undefined;try{
   if(!input.ceiling)throw Error('transmission_policy_not_configured');
   if(!['GET','POST'].includes(request.method))throw Error('invalid_request');
   if(request.method==='POST'&&request.headers.get('origin')!==new URL(request.url).origin)throw Error('forbidden');
@@ -71,7 +71,7 @@ export function normalConsentEndpoint(input:{context:()=>Promise<NormalContext>;
   if(!preview.view.executable)throw Error('source_unreadable');
   const text=await request.text();if(text.length>6000)throw Error('invalid_request');const b=JSON.parse(text);
   if(b.confirmed!==true||b.snapshot!==c.snapshot||b.previewHash!==preview.consent.previewHash||b.policyId!==record.id||b.policyRevision!==record.revision)throw Error('current_preview_consent_required');
-  registered=await input.store.register(c,record,preview.grant,preview.consent);await current();
+  registeredContext=c;registered=await input.store.register(c,record,preview.grant,preview.consent);await current();
   return Response.json({saved:true,snapshot:c.snapshot,policyRevision:record.revision,financialApproval:false},{headers});
- }catch(e){if(registered)try{await input.store.revoke(registered);}catch{}const code=e instanceof Error&&['forbidden','source_changed','current_preview_consent_required','transmission_policy_required','transmission_policy_not_configured','document_selection_required','sensitive_text','source_unreadable','visual_input_limit','ocr_runtime_unavailable','unsupported_format','storage_not_connected','consent_not_saved'].includes(e.message)?e.message:'consent_unavailable';return Response.json({code,saved:false,financialApproval:false},{status:code==='forbidden'?403:409,headers});}};
+ }catch(e){if(registered&&registeredContext)try{await input.store.revoke(registered,registeredContext);}catch{}const code=e instanceof Error&&['forbidden','source_changed','current_preview_consent_required','transmission_policy_required','transmission_policy_not_configured','document_selection_required','sensitive_text','source_unreadable','visual_input_limit','ocr_runtime_unavailable','unsupported_format','storage_not_connected','consent_not_saved'].includes(e.message)?e.message:'consent_unavailable';return Response.json({code,saved:false,financialApproval:false},{status:code==='forbidden'?403:409,headers});}};
 }
