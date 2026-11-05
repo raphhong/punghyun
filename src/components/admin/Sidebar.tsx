@@ -24,5 +24,7 @@ export function Sidebar({ counts, onNavigate, showCashflow = false, showGmail = 
     <p className="ph-sidebar-label">영업 조직</p>
     {item(adminPath("agents"), "영업자 관리", pathname === adminPath("agents"))}
     {item(adminPath("commissions"), "수수료 정산", pathname === adminPath("commissions"))}
+    <p className="ph-sidebar-label">내 계정</p>
+    {item(adminPath("account/password"), "비밀번호 변경", pathname === adminPath("account/password"))}
   </nav>;
 }

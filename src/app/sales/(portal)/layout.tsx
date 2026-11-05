@@ -78,8 +78,9 @@ export default async function PortalLayout({
             <LogoMark size={32} className="h-8 w-8" />
             <span className="text-sm font-bold text-navy-900">풍현 영업자 포털</span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <span className="text-sm text-navy-600">{agent.name}</span>
+            <Link href="/sales/account/password" className="rounded-lg px-3 py-2 text-xs font-medium text-navy-700 hover:bg-navy-50">비밀번호 변경</Link>
             <form action={signOutAgent}>
               <button className="rounded-lg px-3 py-1.5 text-xs font-medium text-navy-500 hover:bg-navy-50">
                 로그아웃
